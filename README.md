@@ -1,68 +1,82 @@
-# mc-ohos-resources
+# MC-OHOS 资源仓库
 
-Cloud resource repository for MC-OHOS — pre-compiled native libraries and JDK data for running Minecraft Java Edition on HarmonyOS NEXT.
+为 HarmonyOS NEXT 预编译的 OpenJDK 和 LWJGL 原生库，用于在鸿蒙设备上运行 Minecraft Java 版。
 
-Used by [MC-OHOS](https://github.com/LZZLHY/MyApplication) launcher. The HAP only ships `libentry.so`; all other native dependencies are downloaded on first launch.
+配合 [MC-OHOS 启动器](https://github.com/LZZLHY/MyApplication) 使用。
 
-## Available Versions
+## 可用版本
 
-| JDK Version | Tag | MC Versions | Status |
-|---|---|---|---|
-| 17 | v17.0.13-ohos-1 | 1.17 ~ 1.20.4 | ✅ Available |
-| 21 | v21.0.1-ohos-1 | 1.20.5+ | 🔜 Planned |
+| JDK 版本 | 标签 | 支持的 MC 版本 | 状态 |
+|----------|------|----------------|------|
+| JDK 17 | v17.0.13-ohos-1 | 1.17 ~ 1.20.4 | ✅ 可用 |
+| JDK 21 | v21.0.5-ohos-1 | 1.20.5+ | ✅ 可用 |
 
-## Release Files (per JDK version)
+## Release 文件说明
 
-Each release contains **3 packages**:
+每个 JDK 版本的 Release 包含以下文件：
 
-| File | Size | Contents | Extract To |
-|---|---|---|---|
-| **jdkXX-ohos-data.zip** | ~97 MB | JDK data (`lib/modules`, `conf/`, etc.) | `filesDir/jdk/<version>/` |
-| **jdkXX-ohos-libs.zip** | ~9 MB | JDK native `.so` (`libjvm.so`, etc.) | `filesDir/libs/` |
-| **lwjgl-ohos-libs.zip** | ~0.4 MB | LWJGL native `.so` (shared across all versions) | `filesDir/libs/` |
+| 文件 | 大小 | 内容 | 用途 |
+|------|------|------|------|
+| **jdkXX-data.zip** | ~66-97 MB | JDK 数据文件（`lib/modules`、`conf/` 等） | 解压到 `filesDir/jdk/<version>/` |
 
-## How It Works
+> **注意**：`.so` 原生库文件随 HAP 打包（HarmonyOS 代码签名限制，无法 dlopen 下载的 .so 文件）
 
-1. User installs MC-OHOS (HAP ~3 MB, only contains `libentry.so`)
-2. On first launch, the JDK Management panel prompts user to download
-3. Three packages are downloaded in order: LWJGL libs → JDK libs → JDK data
-4. All `.so` files extracted to `filesDir/libs/`, JDK data to `filesDir/jdk/<version>/`
-5. Native layer loads `.so` from `filesDir/libs/` via `dlopen()`
-6. JVM is initialized with the downloaded JDK data
+## 工作原理
 
-## Device Sandbox Layout
+1. 用户安装 MC-OHOS 启动器（HAP 包含所有 `.so` 文件）
+2. 首次启动时，JDK 管理面板提示用户下载 JDK 数据
+3. 从 GitHub Releases 下载 `jdkXX-data.zip`（支持镜像加速）
+4. 解压到 `filesDir/jdk/<version>/`
+5. JVM 使用 HAP 中的 `.so` 文件 + 下载的数据文件启动
+
+## 设备沙箱目录结构
 
 ```
 filesDir/
-  libs/                    ← All .so files (JDK + LWJGL)
-    libjvm.so
-    libjli.so
-    liblwjgl.so
-    liblwjgl_opengl.so
-    ...
   jdk/
-    17/                    ← JDK 17 data (MC 1.17~1.20.4)
+    17/                    ← JDK 17 数据（MC 1.17~1.20.4）
       lib/modules
       conf/
       ...
-    21/                    ← JDK 21 data (MC 1.20.5+, future)
+    21/                    ← JDK 21 数据（MC 1.20.5+）
       lib/modules
+      conf/
       ...
-  .minecraft/              ← Minecraft game files
+  .minecraft/              ← Minecraft 游戏文件
 ```
 
-## Build
+## 多版本 JDK 支持
 
-JDK is cross-compiled from OpenJDK source using Docker:
+MC-OHOS 支持多版本 JDK 并存：
+
+- **JDK 17**：适用于 Minecraft 1.17 ~ 1.20.4
+- **JDK 21**：适用于 Minecraft 1.20.5+
+
+`.so` 文件使用版本后缀区分：
+- JDK 17: `libjvm.so`, `libjava.so`, ...
+- JDK 21: `libjvm21.so`, `libjava21.so`, ...
+
+## 编译说明
+
+JDK 使用 Docker 交叉编译：
 
 ```bash
+# 构建 Docker 镜像
 cd docker/
-docker build -f Dockerfile.openjdk-ohos -t ohos-jdk17 .
-docker run --name ohos-debug ohos-jdk17 bash /build/build_jdk17_ohos.sh
-bash scripts/pack_jdk_release.sh 17 v17.0.13-ohos-1
+docker build -f Dockerfile.openjdk-ohos -t ohos-jdk .
+
+# 编译 JDK 17
+docker run --name ohos-debug ohos-jdk bash /build/build_jdk17_ohos.sh
+
+# 编译 JDK 21
+docker exec ohos-debug bash /build/build_jdk21_ohos.sh
+
+# 打包
+bash scripts/pack_jdk_split.sh 17
+bash scripts/pack_jdk_split.sh 21
 ```
 
-## License
+## 许可证
 
-OpenJDK is licensed under GPL v2 with Classpath Exception.
-LWJGL is licensed under BSD 3-Clause.
+- OpenJDK: GPL v2 with Classpath Exception
+- LWJGL: BSD 3-Clause

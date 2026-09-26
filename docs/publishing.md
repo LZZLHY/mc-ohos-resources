@@ -7,6 +7,7 @@
 - runtimeId 固定主版本、平台和布局；buildId 固定 Java 版本、文件名、大小与 SHA-256。修改包字节使用新 buildId/文件名，不 `--clobber` 旧资产。
 - `catalogRevision` 每次目录变化增加；只改变某个 JDK 推荐时只增加该项 `recommendationRevision`。镜像变化不增加推荐代次。
 - 撤回将 build 设为 `withdrawn` 并提供其它推荐。回滚指向仍登记的旧 build，但推荐代次继续增加，不能回退 JSON 代次。
+- 需要精确回退时，在该通道 recommendations 中增加 `rollback: { "fromBuildIds": ["坏构建ID"], "reason": "已定位的回归与回退原因" }`，生成后位于 runtime.rollback。fromBuildIds 必须属于同一 runtime 且全部标记 withdrawn；两个通道都不能继续推荐撤回构建。修改回退范围/原因也增加 recommendationRevision。撤回 ID 不可复活，修复或更正使用新的 buildId。
 - 新平台/adapter 可以进入结构合法的目录，当前不支持的 HAP 不安装。新主版本须经过构建与验收，不能只修改主版本号。
 - 稳定通道新源码构建必须达到 `device-matrix-tested`，legacy 为兼容迁移例外。当前新包均在预览通道，用户单场景反馈不能冒充设备矩阵。
 

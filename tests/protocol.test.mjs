@@ -47,3 +47,11 @@ test('unverified build cannot be promoted to stable by signing tool',()=>{
   const changed=structuredClone(source);changed.runtimes[1].recommendations.stable=changed.runtimes[1].recommendations.preview;
   assert.throws(()=>projectCatalog(changed,'stable'),/device matrix/);
 });
+test('explicit rollback references exact runtime builds and increments recommendation revision',()=>{
+  const c=fresh(),next=structuredClone(c);next.catalogRevision++;
+  next.runtimes[1].rollback={fromBuildIds:['17-runtime-audio-rc2'],reason:'回退已定位的回归'};
+  next.builds.find(b=>b.id==='17-runtime-audio-rc2').status='withdrawn';
+  validateCatalog(next);assert.throws(()=>validateTransition(c,next));
+  next.runtimes[1].recommendationRevision++;validateTransition(c,next);
+  next.runtimes[1].rollback.fromBuildIds=[next.builds[0].id];assert.throws(()=>validateCatalog(next));
+});

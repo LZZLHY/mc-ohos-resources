@@ -1,0 +1,40 @@
+{
+  "file": "/output/jdk21-ohos-runtime-audio-rc2.zip",
+  "bytes": 115303455,
+  "sha256": "9a427d204595fee5edc230d15aef25aefc34a8983f6c976e7e213f330f70107f",
+  "build": {
+    "repository": "https://github.com/openjdk/jdk21u.git",
+    "commit": "dfcd8d2eecfe62e91070244d8eb10906dc3c812d",
+    "major": "21",
+    "head": "dfcd8d2eecfe62e91070244d8eb10906dc3c812d",
+    "inputsSha256": "274920090f2e45003fdb5248750b97011f92585e8660596ab85933b61275f302",
+    "patches": {
+      "series": "5c335383d27a47d4dccfc5d5534e311bd4371e893f592dfbc424cbc98a7d4dd0",
+      "0001-musl-dlvsym-dlinfo.patch": "11166cb7ea0acdc9b01d49452fb5eba84f1a57eb1be17742f8cac9c014f37969",
+      "0002-java-home-env.patch": "a5124ed787e533d27737241c34605c902940412b4ed8cc883157f55ab6230479",
+      "0003-dll-dir-env.patch": "072c71243642a5e4dfd5491c3b4d9065cb59b4a5221629185b1590494d90940d",
+      "0004-musl-utmpx.patch": "54d6181c598c3df6c44615b3438f5e7a9b0f16245f62ff711634d9f063e86bd5",
+      "0005-signals-posix-abort-if-unrecognized.patch": "9f65a218b30eeb8717494a11f76722130ec63924092a1ea1a25a74f24c1d9364",
+      "0006-aarch64-elf-safepoint-fallback.patch": "632265113e3973d0311ba6c928c46d9e70a9a7720990a6f3b89bcd9195978433",
+      "0007-safepoint-mechanism-mem-prot-read.patch": "8bef044b9e6204a19179c38719adf3d572509777202c8bb45d4d2ea58708151e",
+      "0008-libjli-skip-re-exec.patch": "81e0d008e52b50739561aea34f551af1b7d1a4e8df3fa972bb6ae857d57a0ceb",
+      "0010-ipv6-supported-sandbox-fallback.patch": "a02b88ef11a4aad963cc57ec9511664c9690f184ed199355e68d270743f73f58",
+      "0011-ohos-javasound-capabilities.patch": "87b78eafbc4765a9549303751a64c413e96b6f88a0f39b3e0b52c780f2b71346",
+      "0013-ohos-linux-container-build-host.patch": "c2f814798bcbb57a48e60189cf43a07344728ec4a891676c2ee9298fa47fed6b"
+    },
+    "sourceDiffSha256": "03acf3e697ffcd6325632164cbdd1887d38347af341ad1fde979d76ee059f171",
+    "specSha256": "ff82e5753808516ee1002b00bf59bb4d09945f2d8ae803eecc0d62211db5cc17",
+    "compiler": "Ubuntu clang version 15.0.7\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "bootJdk": "openjdk version \"21.0.11\" 2026-04-21 LTS\nOpenJDK Runtime Environment Temurin-21.0.11+10 (build 21.0.11+10-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.11+10 (build 21.0.11+10-LTS, mixed mode, sharing)",
+    "sysrootSentinels": "ca2ea5602d0320183d7acb2535005784d429c30b5583c3663d9e51dbf9862d52",
+    "sysrootIdentityScope": "setup recipe and three SDK sentinels; complete target libraries are verified separately",
+    "release": "IMPLEMENTOR=\"N/A\"\nJAVA_RUNTIME_VERSION=\"21.0.5-internal-adhoc.root.jdk21u\"\nJAVA_VERSION=\"21.0.5\"\nJAVA_VERSION_DATE=\"2024-10-15\"\nLIBC=\"musl\"\nMODULES=\"java.base java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.logging java.management java.security.sasl java.naming java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.jvmstat jdk.attach jdk.charsets jdk.internal.opt jdk.zipfs jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.incubator.vector jdk.internal.le jdk.internal.vm.ci jdk.internal.vm.compiler jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jfr jdk.jlink jdk.jpackage jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.rmi jdk.net jdk.nio.mapmode jdk.random jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported jdk.unsupported.desktop jdk.xml.dom\"\nOS_ARCH=\"aarch64\"\nOS_NAME=\"Linux\"\nSOURCE=\".:git:dfcd8d2eecfe+\"\n",
+    "recipes": {
+      "build_jdk21_ohos.sh": "7424f82b37d07743993c490aa22b65211abf81ffec3fa2e126cc7b0028dbb073",
+      "setup_toolchain.sh": "2669e8b3fa8588b16b284e66b27069b020524743094b6211a9141e8823e2ff7b",
+      "rebuild_libjli.sh": "cfcc726def22b5801fb7ba28d6cb02ec17e456f6fa4e98f87aae71c16c965722",
+      "package_runtime.py": "2fab667302f806d761452f31769ffc6b7345ca97dda6a8d859d9c4acc7e5a6d3",
+      "pack_jdk_full.sh": "73a7d2c0228f31f632ed446bef8eb63e57e1ecb2e6054d4c5d4e4c86f8c7a383"
+    }
+  }
+}

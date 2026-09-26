@@ -1,0 +1,7 @@
+{
+  "name": "amcl-runtime-catalog",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test tests/*.test.mjs", "check": "node tools/catalog.mjs check" }
+}

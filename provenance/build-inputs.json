@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "runtimeBuildId": "8-catalog-rc1",
+      "fileName": "jdk8-catalog-rc1-build-inputs.zip",
+      "sizeBytes": 237264,
+      "sha256": "91137bfbd9054475310b89581eea99faafa5107eace2e39376bfe24150688fa0",
+      "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk8-catalog-rc1-build-inputs.zip"
+    },
+    {
+      "runtimeBuildId": "17-runtime-audio-rc2",
+      "fileName": "jdk17-runtime-audio-rc2-build-inputs.zip",
+      "sizeBytes": 232445,
+      "sha256": "9c7d7b084e0655c034413b1e5cbf465af56dae0aa38d2e020f5e906005bc56d4",
+      "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk17-runtime-audio-rc2-build-inputs.zip"
+    },
+    {
+      "runtimeBuildId": "21-runtime-audio-rc2",
+      "fileName": "jdk21-runtime-audio-rc2-build-inputs.zip",
+      "sizeBytes": 229068,
+      "sha256": "51dbe5a83f95fdee1b5be5955371b814e7827bc79258d47f26803e909fa8ef50",
+      "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk21-runtime-audio-rc2-build-inputs.zip"
+    },
+    {
+      "runtimeBuildId": "25-runtime-audio-rc2",
+      "fileName": "jdk25-runtime-audio-rc2-build-inputs.zip",
+      "sizeBytes": 229986,
+      "sha256": "cc13ed44d8443bf489c32e977dbb15a5d9931a475f70fc7d3ada1933928af4ee",
+      "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk25-runtime-audio-rc2-build-inputs.zip"
+    }
+  ]
+}

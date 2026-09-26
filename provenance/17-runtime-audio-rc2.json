@@ -1,0 +1,41 @@
+{
+  "file": "/output/jdk17-ohos-runtime-audio-rc2.zip",
+  "bytes": 108047786,
+  "sha256": "4d04c2871f6892272e36e5f055bb5fd57b541678faa54b34754476be8cad1957",
+  "build": {
+    "repository": "https://github.com/openjdk/jdk17u.git",
+    "commit": "b7d004b4f2787ea49454291d48326ad1cd97c0d0",
+    "major": "17",
+    "head": "b7d004b4f2787ea49454291d48326ad1cd97c0d0",
+    "inputsSha256": "274920090f2e45003fdb5248750b97011f92585e8660596ab85933b61275f302",
+    "patches": {
+      "series": "6754de51075bc89a04a1addb86bf6f2e03516cfc2ef70dc879902be782faf70d",
+      "0001-musl-dlvsym-dlinfo.patch": "5131995f8b5221bfb5ae9c431b90689590597638644dddad64c7eaf1c01e01c8",
+      "0002-java-home-env.patch": "fe0aef5d8def07c1b758f97173119deb6af13369fbc25d4edb828fbb12e67bd0",
+      "0003-dll-dir-env.patch": "2ec357c9863327dfd5d083e6174b65ab7e5fc3df29e74026c1efce947746ec56",
+      "0004-musl-utmpx.patch": "3bea17dfb7e0eb2818be06b59749b0e76e7bb2402288d34d66bc140a9cfa0219",
+      "0005-signals-posix-abort-if-unrecognized.patch": "bb31bda15e11b83c104befad71e15831067d0cf1760b47a9ebc0655ec9c8315b",
+      "0006-aarch64-elf-safepoint-fallback.patch": "29b4f83be122ada9727ed58275e0d22c69147fa88f13e5cc46d709c870dbafb5",
+      "0007-safepoint-mechanism-mem-prot-read.patch": "6b96a5eb03658963858fe5653ba30b5fd2dbd1eb682f94969255826a04cc4031",
+      "0008-libjli-skip-re-exec.patch": "9b9a4e51051594b6ce5b2741ada35b86139bcc134d3de884e744643bc0e5304e",
+      "0010-ipv6-supported-sandbox-fallback.patch": "7f4d6218a8c4f63170fd62536aa2357c5de18dca885e2dfa5884ccad0777cf15",
+      "0011-ohos-javasound-capabilities.patch": "87b78eafbc4765a9549303751a64c413e96b6f88a0f39b3e0b52c780f2b71346",
+      "0012-ohos-buildjdk-libc-guard.patch": "870713d6adb727eb04fe9b899495f6b4dd2be0dbddca590efd8d6a5ba0aa58cd",
+      "0013-ohos-linux-container-build-host.patch": "d565da4e38933a415013ffa8b360b0b53be4dbb14376678b0ca831cbaaed30f8"
+    },
+    "sourceDiffSha256": "d6289c1705802798b313849369bcda41d589b70ebb90875077f030796ce773a3",
+    "specSha256": "5d346f0396e94c9d612fe9096e62bb1dc8c19c1084ed10c38185bc6cbcb91e8e",
+    "compiler": "Ubuntu clang version 15.0.7\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "bootJdk": "openjdk version \"17.0.18\" 2026-01-20\nOpenJDK Runtime Environment (build 17.0.18+8-Ubuntu-122.04.1)\nOpenJDK 64-Bit Server VM (build 17.0.18+8-Ubuntu-122.04.1, mixed mode, sharing)",
+    "sysrootSentinels": "ca2ea5602d0320183d7acb2535005784d429c30b5583c3663d9e51dbf9862d52",
+    "sysrootIdentityScope": "setup recipe and three SDK sentinels; complete target libraries are verified separately",
+    "release": "IMPLEMENTOR=\"N/A\"\nJAVA_RUNTIME_VERSION=\"17.0.19-internal+0-adhoc..jdk17u\"\nJAVA_VERSION=\"17.0.19\"\nJAVA_VERSION_DATE=\"2026-04-21\"\nLIBC=\"musl\"\nMODULES=\"java.base java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.logging java.management java.security.sasl java.naming java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.jvmstat jdk.attach jdk.charsets jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.incubator.foreign jdk.incubator.vector jdk.internal.le jdk.internal.opt jdk.internal.vm.ci jdk.internal.vm.compiler jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jfr jdk.jlink jdk.jpackage jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.rmi jdk.net jdk.nio.mapmode jdk.random jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported jdk.unsupported.desktop jdk.xml.dom jdk.zipfs\"\nOS_ARCH=\"aarch64\"\nOS_NAME=\"Linux\"\nSOURCE=\".:git:b7d004b4f278+\"\n",
+    "recipes": {
+      "build_jdk17_ohos.sh": "91933249fe48eafc6ebc8de12e414c48e7dc0a4f967a2899d6d6ad7dfe18e67c",
+      "setup_toolchain.sh": "2669e8b3fa8588b16b284e66b27069b020524743094b6211a9141e8823e2ff7b",
+      "rebuild_libjli.sh": "cfcc726def22b5801fb7ba28d6cb02ec17e456f6fa4e98f87aae71c16c965722",
+      "package_runtime.py": "2fab667302f806d761452f31769ffc6b7345ca97dda6a8d859d9c4acc7e5a6d3",
+      "pack_jdk_full.sh": "73a7d2c0228f31f632ed446bef8eb63e57e1ecb2e6054d4c5d4e4c86f8c7a383"
+    }
+  }
+}

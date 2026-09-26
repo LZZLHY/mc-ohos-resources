@@ -1,0 +1,46 @@
+{
+  "file": "/output/jdk8-ohos-catalog-rc1.zip",
+  "bytes": 40580832,
+  "sha256": "dfd6e136e0d8a143fb69c9fdd986f1ce1e5c2817902cd5749e5aa076c1aba57c",
+  "build": {
+    "repository": "https://github.com/openjdk/jdk8u-dev.git",
+    "commit": "35c254f58c70663df28cc7d15c9545c88250b6ce",
+    "bootJdk": "openjdk version \"1.8.0_452\"\nOpenJDK Runtime Environment (Temurin)(build 1.8.0_452-b09)\nOpenJDK 64-Bit Server VM (Temurin)(build 25.452-b09, mixed mode)",
+    "freetype": {
+      "repository": "https://github.com/freetype/freetype.git",
+      "commit": "42608f77f20749dd6ddc9e0536788eaad70ea4b5",
+      "version": "2.13.3"
+    },
+    "major": "8",
+    "head": "35c254f58c70663df28cc7d15c9545c88250b6ce",
+    "inputsSha256": "48a667256660ac3edb760b13a9bfff0238082e07e9c639cf4f7d058908f901e2",
+    "patches": {
+      "series": "e35ffa5e20f6bf93abbb1eedefbd79a94fd069514119b584e0d63fc69b728a5f",
+      "0001-ohos-musl-clang-source-fixes.patch": "d84504fa3b1ed5a8ac159bd93a2c15ebe66c32bfcc26c6e56a4e6b87b836de33",
+      "0002-ohos-clang-codegen-ub-fixes.patch": "f62deec9381662caf4346a6134eb2bc70747372644b9d019650307d842ca07f3",
+      "0003-ohos-manifestentryverifier-legacy-ctor.patch": "641dd8cdcfc3d3b904677bfde96aa68d60c67d03bd443ecad63daf1ab0a3c00d",
+      "0010-ipv6-supported-sandbox-fallback.patch": "bdd4b311e93064e8f3abe0f66803dfc97f4e8ac737682a12aefb6fd24bbe5fca",
+      "0011-ohos-java-sound-capability.patch": "e2c3fe015bf63e45c5fbc46c66991648b46669e56cf7016b2423170e23bd7aa4",
+      "0012-configure-propagate-failure.patch": "3f1de732d2f117894b871669c143d440f79268fa2c73c92c6905909f2eb142cd"
+    },
+    "sourceDiffSha256": "6934de5ef58335166ee77ddd2d29016e29ca8cf8bb3a3e16c0f52285a862e5a0",
+    "specSha256": "161b03273f077947556b0b6fb67900c51ade53e9dcb279ed2cd6e7cd316652f6",
+    "compiler": "Ubuntu clang version 15.0.7\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "sysrootSentinels": "ca2ea5602d0320183d7acb2535005784d429c30b5583c3663d9e51dbf9862d52",
+    "sysrootIdentityScope": "setup recipe and three SDK sentinels; complete target libraries are verified separately",
+    "release": "JAVA_VERSION=\"1.8.0_452\"\nOS_NAME=\"Linux\"\nOS_VERSION=\"2.6\"\nOS_ARCH=\"aarch64\"\nSOURCE=\".:git:35c254f58c70+\"\n",
+    "recipes": {
+      "build_jdk8_ohos.sh": "2d6eca691ed8a4a2896e79426c3f7a6977db9b901de8234a4fd72d64bacd9059",
+      "setup_toolchain.sh": "2669e8b3fa8588b16b284e66b27069b020524743094b6211a9141e8823e2ff7b",
+      "rebuild_libjli.sh": "cfcc726def22b5801fb7ba28d6cb02ec17e456f6fa4e98f87aae71c16c965722",
+      "package_runtime.py": "a0fb519b05695276105d7aec7ed6b886416cde910a030625495e1d4191cb2cad",
+      "pack_jdk_full.sh": "7a51d9918faffe75f4625dbe23d0508209ab712b932c9f6edf02ebcf5ea09911",
+      "prepare_freetype8.sh": "4ac9661bac59aad482eae29d9c8727c5604828f1e54b22266eb4262e6bb3cb4a",
+      "../jdk8_musl_compat.c": "4fd5196dd45236cbbc72ab51c3570564995758e599ed45caf6c768d015f6550d"
+    },
+    "freetypeBuild": {
+      "head": "42608f77f20749dd6ddc9e0536788eaad70ea4b5",
+      "librarySha256": "dffe2d8d6ce69e077b7c083e10edc59cb2d5d58db4173802fddfea5ead6db0b6"
+    }
+  }
+}

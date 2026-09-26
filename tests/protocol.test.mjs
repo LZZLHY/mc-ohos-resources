@@ -21,6 +21,7 @@ const invalid=[
   ['fraction',c=>c.catalogRevision=1.5],['unsafe integer',c=>c.catalogRevision=Number.MAX_SAFE_INTEGER+1],
   ['script',c=>c.runtimes[0].installScript='echo x'],['withdrawn recommended',c=>c.builds[0].status='withdrawn'],
   ['wrong list',c=>c.runtimes=null],['unknown source',c=>c.builds[0].downloads[0].sourceId='ftp']
+  ,['web mislabeled as github',c=>c.builds[0].downloads[0].url='https://amcl.lovedhy.cn/runtimes/test.zip']
 ];
 for(const [name,change] of invalid) test('reject '+name,()=>{const c=fresh();change(c);assert.throws(()=>validateCatalog(c));});
 test('future adapter is structurally valid, not falsely assumed installable',()=>{const c=fresh();c.runtimes[0].adapter='future-layout';validateCatalog(c);});

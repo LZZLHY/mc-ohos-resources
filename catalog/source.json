@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "catalogRevision": 1,
-  "issuedAt": "2026-09-26T18:16:22Z",
+  "catalogRevision": 2,
+  "issuedAt": "2026-10-06T12:50:07Z",
   "expiresAt": "2027-09-26T18:16:22Z",
   "runtimes": [
     {
@@ -21,8 +21,8 @@
           "recommendedBuildId": "8u452-ohos-4"
         },
         "preview": {
-          "recommendationRevision": 2,
-          "recommendedBuildId": "8-catalog-rc1"
+          "recommendationRevision": 3,
+          "recommendedBuildId": "8-runtime-link-rc1"
         }
       }
     },
@@ -528,6 +528,55 @@
         "evidence": [
           "干净工作卷完整 images/打包通过；Java Sound 宿主真实加载、硬件 provider 为空、MIDI/WAV 往返与音序事件传递通过。",
           "不据此声称 OHOS JVM 或真机模组矩阵已经通过。"
+        ]
+      },
+      "status": "available"
+    },
+    {
+      "id": "8-runtime-link-rc1",
+      "runtimeId": "java8-ohos-aarch64",
+      "javaVersion": "1.8.0_452",
+      "legacyTags": [],
+      "archive": {
+        "type": "zip",
+        "fileName": "jdk8-ohos-runtime-link-rc1.zip",
+        "sizeBytes": 40588154,
+        "sha256": "0341df3a5b867fb98f791da00cbfc7d5ee0ab70234ff496c66ca1828113cdf5e"
+      },
+      "downloads": [
+        {
+          "sourceId": "github",
+          "transport": "single-file",
+          "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk8-ohos-runtime-link-rc1.zip"
+        },
+        {
+          "sourceId": "web",
+          "transport": "single-file",
+          "url": "https://amcl.lovedhy.cn/runtimes/packages/jdk8-ohos-runtime-link-rc1.zip"
+        }
+      ],
+      "notes": [
+        "修复 JDK8 的 JFR BitSet 缺少真实分配器模板定义导致 JVM 创建前装载失败。",
+        "完整干净重建，保留旧 Forge 构造器、IPv6 与安全 Java Sound 平台适配；增加启动根强符号发布审核。",
+        "完整 images、依赖闭包、ZIP 读回、宿主 MIDI/WAV/音序和实际 AArch64 Platform 叶函数通过；OHOS 真机矩阵待验证。"
+      ],
+      "capabilities": [
+        "headless-awt",
+        "native-midi-unavailable-safe",
+        "native-pcm-unavailable-safe",
+        "ports-unavailable-safe"
+      ],
+      "validationLevel": "artifact-audited",
+      "provenance": {
+        "kind": "source-build",
+        "sourceRepository": "https://github.com/openjdk/jdk8u-dev.git",
+        "sourceCommit": "35c254f58c70663df28cc7d15c9545c88250b6ce",
+        "manifestSha256": "5cb014a1d5d619848b15724ed45a860b5385372ea5592a0b113cfa01302445d0",
+        "evidence": [
+          "Fresh 请求 docker-jdk8-20261006-203526-6e3cfc 完整 images 与打包退出0；40,588,154 B，0341df3a5b867fb98f791da00cbfc7d5ee0ab70234ff496c66ca1828113cdf5e。",
+          "启动根非 weak 符号闭包通过；坏 JDK8 原件负例拒绝，现役17/21/25对照通过。",
+          "固定 qa java-sound-8 与本包实际 AArch64 Platform 叶函数通过；不提升为 OHOS JVM/游戏启动通过。",
+          "AMCL 修复代码 1ca8bb41459b2f6d1c8bc02d8cc06346abdb0331；源码输入导出 c6fff095d326478f93593fa9b9e0892f99dcf2bd，16项收据输入摘要一致。"
         ]
       },
       "status": "available"

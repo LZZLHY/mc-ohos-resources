@@ -6,6 +6,8 @@ AMCL 的 HarmonyOS NEXT OpenJDK 运行包、签名目录和来源记录。目标
 
 当前新构建进入**预览通道**。JDK17 + 新 HAP + Minecraft 1.20.1 + Immersive Melodies 已收到用户通过反馈；没有对应精确设备日志和包摘要，不能推广为全部设备或模组通过。JDK8 已补齐完整重建、打包审计、宿主 MIDI/WAV/音序测试与实际 ARM64 Platform 叶函数验证，仍待 OHOS 真机回归。
 
+2026-10-06 的 JDK8 `8-runtime-link-rc1` 预览修复了 JFR BitSet 缺少分配器模板定义引起的 JVM 装载失败。它使用新的不可变文件名、完整来源和启动根强符号审计；其他 JDK 推荐不变。设备验收状态以签名目录和本次来源记录为准。
+
 ## 使用目录
 
 - [catalog/source.json](catalog/source.json)：唯一手工目录源，维护稳定/预览推荐、完整包与分卷 SHA-256、大小、URL、能力和验收证据。

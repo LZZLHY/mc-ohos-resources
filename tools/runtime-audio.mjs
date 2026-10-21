@@ -7,6 +7,8 @@ import {createHash} from 'node:crypto';
 import {isDeepStrictEqual as same} from 'node:util';
 import {sha256} from './protocol.mjs';
 import {crc32} from './source-archive.mjs';
+import {REQUIRED_MIDI_SYMBOLS,MIDI_SDK_PATH,requiresRuntimeMidi,verifyRuntimeMidiFacts,validateRuntimeMidiAudit} from './runtime-midi.mjs';
+import {requiresRuntimePorts,verifyRuntimePortsFacts,validateRuntimePortsAudit} from './runtime-ports.mjs';
 
 const assert=(ok,message)=>{if(!ok)throw new Error(message);};
 const HASH=/^[a-f0-9]{64}$/;
@@ -39,7 +41,7 @@ export const REQUIRED_TIMELINE_AUDIO_SYMBOLS=[...REQUIRED_AUDIO_SYMBOLS.filter(n
   !['OH_AudioRenderer_GetTimestamp','OH_AudioRenderer_GetFramesWritten'].includes(name)),
   'OH_AudioRenderer_GetAudioTimestampInfo'].sort();
 const SYSTEM=new Set(['libc.so','libm.so','libdl.so','libpthread.so','librt.so','libz.so','ld-musl-aarch64.so.1']);
-export const requiresRuntimeAudio=receipt=>[AUDIO_PATCH,AUDIO_DUPLEX_PATCH,AUDIO_TIMELINE_PATCH].some(name=>Object.hasOwn(receipt?.build?.patches??{},name));
+export const requiresRuntimeAudio=receipt=>[AUDIO_PATCH,AUDIO_DUPLEX_PATCH,AUDIO_TIMELINE_PATCH].some(name=>Object.hasOwn(receipt?.build?.patches??{},name))||requiresRuntimeMidi(receipt)||requiresRuntimePorts(receipt);
 
 /** 由真实冻结补丁身份选合同；V2不能缺失宿主ABI义务，也不能降级到V1标记蒙混通过。 */
 function audioContract(receipt){
@@ -74,17 +76,25 @@ export function audioElfFacts(bytes){
   };
   const namesIndex=u16(62);assert(namesIndex<count,'audio ELF section names index outside table');
   const names=namesIndex?bounded(sections[namesIndex].offset,sections[namesIndex].size):Buffer.alloc(0);
-  const needed=[],imports=[],exports=[],strong=[],weak=[],available=[],markers=[],sonames=[];
+  const needed=[],imports=[],exports=[],strong=[],weak=[],available=[],functions=[],sonames=[];
+  const markers={'.amcl.daudio':[],'.amcl.midi':[],'.amcl.ports':[]};
+  const phoff=u64(32),phcount=u16(56);assert(!phcount||u16(54)===56,'audio ELF program header size invalid');bounded(phoff,phcount*56);
+  const loads=[];
+  for(let i=0;i<phcount;i++){
+    const at=phoff+i*56;if(u32(at)!==1)continue;
+    const item={flags:u32(at+4),offset:u64(at+8),address:u64(at+16),size:u64(at+32),memory:u64(at+40)};
+    assert(item.size<=item.memory,'audio ELF load file size exceeds memory');bounded(item.offset,item.size);loads.push(item);
+  }
   for(const section of sections){
-    if(names.length&&string(names,section.name)==='.amcl.daudio'){
-      const phoff=u64(32),phcount=u16(56);assert(u16(54)===56&&phcount>0,'audio marker lacks program headers');bounded(phoff,phcount*56);
+    const sectionName=names.length?string(names,section.name):'';
+    if(Object.hasOwn(markers,sectionName)){
+      assert(phcount>0,'audio marker lacks program headers');
       let mappedReadonly=false;
-      for(let i=0;i<phcount;i++){
-        const at=phoff+i*56,type=u32(at),flags=u32(at+4),offset=u64(at+8),address=u64(at+16),filesize=u64(at+32);
-        if(type===1&&(flags&4)&&!(flags&2)&&offset+filesize<=bytes.length&&section.offset>=offset&&
-          section.offset+section.size<=offset+filesize&&section.address>=address&&section.address-address===section.offset-offset)mappedReadonly=true;
+      for(const {flags,offset,address,size:filesize} of loads){
+        if((flags&4)&&!(flags&2)&&section.offset>=offset&&section.offset+section.size<=offset+filesize&&
+          section.address>=address&&section.address-address===section.offset-offset)mappedReadonly=true;
       }
-      markers.push({type:section.type,flags:section.flags,bytes:section.size,valueHex:bounded(section.offset,section.size).toString('hex'),mappedReadonly});
+      markers[sectionName].push({type:section.type,flags:section.flags,bytes:section.size,valueHex:bounded(section.offset,section.size).toString('hex'),mappedReadonly});
     }
     if(![6,11].includes(section.type))continue;
     assert(section.link<count,'audio ELF string table link outside sections');const strings=sections[section.link];
@@ -100,14 +110,22 @@ export function audioElfFacts(bytes){
         const name=data.readUInt32LE(offset),binding=data[offset+4]>>>4,visibility=data[offset+5]&3,index=data.readUInt16LE(offset+6);
         if(!name||![1,2].includes(binding))continue;const symbol=string(table,name);
         if(index===0){imports.push(symbol);(binding===1?strong:weak).push(symbol);}
-        else{exports.push(symbol);if([0,3].includes(visibility)&&data.readBigUInt64LE(offset+8)!==0n)available.push(symbol);}
+        else{exports.push(symbol);const address=data.readBigUInt64LE(offset+8);
+          if([0,3].includes(visibility)&&address!==0n){available.push(symbol);
+            if([2,10].includes(data[offset+4]&15)&&loads.some(load=>(load.flags&1)&&address>=BigInt(load.address)&&address<BigInt(load.address+load.size)))functions.push(symbol);
+          }
+        }
       }
     }
   }
   const unique=values=>[...new Set(values)].sort();
   assert(sonames.length<=1,'audio ELF duplicate SONAME');
-  return{needed:unique(needed),imports:unique(imports),exports:unique(exports),strongImports:unique(strong),weakImports:unique(weak),resolvableExports:unique(available),
-    ...(sonames.length?{soname:sonames[0]}:{}),...(markers.length?{ohosDaudioMarkers:markers}:{})};
+  const readonly=loads.filter(load=>(load.flags&4)&&!(load.flags&2)).map(load=>bounded(load.offset,load.size));
+  return{needed:unique(needed),imports:unique(imports),exports:unique(exports),strongImports:unique(strong),weakImports:unique(weak),resolvableExports:unique(available),resolvableFunctionExports:unique(functions),
+    ...(sonames.length?{soname:sonames[0]}:{}),
+    ...Object.fromEntries([['.amcl.daudio','ohosDaudioMarkers'],['.amcl.midi','ohosMidiMarkers'],['.amcl.ports','ohosPortsMarkers']]
+      .filter(([section])=>markers[section].length).map(([section,field])=>[field,markers[section]])),
+    ...(markers['.amcl.midi'].length?{ohosMidiDynamicSymbols:REQUIRED_MIDI_SYMBOLS.filter(name=>readonly.some(data=>data.includes(Buffer.from(name+'\0'))))}:{})};
 }
 
 /** 只接受明确库名及摘要；相同SDK可用于数代，不依赖维护者当前SDK目录同名文件。 */
@@ -118,7 +136,7 @@ export async function readAudioSdkProviders(path){
     Object.keys(data).every(k=>['schemaVersion','providers'].includes(k)),'invalid audio SDK provider map');
   const result=new Map();
   for(const item of data.providers){
-    assert(item.name==='libohaudio.so'&&HASH.test(item.sha256)&&typeof item.path==='string'&&isAbsolute(item.path)&&
+    assert(['libohaudio.so','libohmidi.so'].includes(item.name)&&HASH.test(item.sha256)&&typeof item.path==='string'&&isAbsolute(item.path)&&
       Object.keys(item).every(k=>['name','sha256','path'].includes(k))&&!result.has(item.sha256),'invalid/duplicate audio SDK provider');
     const info=await stat(item.path);assert(info.isFile()&&info.size>0&&info.size<=64*1024*1024,'audio SDK provider size/type invalid');
     const bytes=await readFile(item.path);assert(sha256(bytes)===item.sha256,'audio SDK provider hash mismatch');result.set(item.sha256,bytes);
@@ -151,13 +169,18 @@ export function verifyAudioRuntimeFiles(files,entries,receipt,providers){
     const actual=audioElfFacts(files.get(name)),declared=manifest.nativeLibraries[name];
     for(const key of ['needed','imports','exports','strongImports','weakImports','resolvableExports'])
       assert(same(actual[key],declared[key]),'audio runtime ELF facts differ from manifest: '+name+' '+key);
-    assert(same(actual.ohosDaudioMarkers??[],declared.ohosDaudioMarkers??[]),'audio runtime marker claim differs from ELF');
+    for(const key of ['ohosDaudioMarkers','ohosMidiMarkers','ohosPortsMarkers','ohosMidiDynamicSymbols'])
+      assert(same(actual[key]??[],declared[key]??[]),'audio runtime marker/dynamic claim differs from ELF: '+key);
+    if(declared.resolvableFunctionExports!==undefined)
+      assert(same(actual.resolvableFunctionExports,declared.resolvableFunctionExports),'audio runtime executable export facts differ from ELF');
     assert(!actual.imports.some(n=>n.startsWith('snd_')),'runtime still imports unsupported ALSA');
     const isSound=name===soundPath;
     for(const dependency of actual.needed)assert(basenames.has(dependency)||SYSTEM.has(dependency)||(isSound&&dependency==='libohaudio.so'),
       'unknown/unscoped runtime dependency: '+name+' -> '+dependency);
     if(isSound)sound=actual;
-    else assert(!actual.ohosDaudioMarkers?.length&&!actual.imports.some(n=>n.startsWith('OH_Audio'))&&!declared.javaSoundBackend,
+    else assert(!actual.ohosDaudioMarkers?.length&&!actual.ohosMidiMarkers?.length&&!actual.ohosPortsMarkers?.length&&
+      !actual.imports.some(n=>n.startsWith('OH_Audio')||n.startsWith('OH_MIDI'))&&
+      !declared.javaSoundBackend&&!declared.javaSoundMidiBackend&&!declared.javaSoundPortsBackend,
       'audio capability/import outside libjsound');
   }
   assert(sound,'new audio build has no libjsound');
@@ -174,12 +197,24 @@ export function verifyAudioRuntimeFiles(files,entries,receipt,providers){
   assert(same(manifest.nativeLibraries[soundPath].javaSoundBackend,backend),'audio capability supplier proof differs from actual ELF/SDK');
   const caps=manifest.capabilities??{};
   assert(caps['javaSound.nativePcm']===contract.pcm&&caps['javaSound.nativePlayback']===backend.qualification&&
-    caps['javaSound.nativeCapture']===contract.capture&&caps['javaSound.nativeMidi']==='unavailable-safe'&&caps['javaSound.ports']==='unavailable-safe',
+    caps['javaSound.nativeCapture']===contract.capture,
     'audio capabilities overclaim or omit exact playback/capture status');
+  const ports=verifyRuntimePortsFacts({facts:sound,sdkFacts,sdkSha256:sdkHash,receipt,
+    declaredBackend:manifest.nativeLibraries[soundPath].javaSoundPortsBackend,capability:caps['javaSound.ports']});
+  let midiSdkHash, midiSdkFacts;
+  if(requiresRuntimeMidi(receipt)){
+    midiSdkHash=receipt.build.inputClosure?.nativeSdk?.files?.[MIDI_SDK_PATH];
+    const provider=providers.get(midiSdkHash);
+    assert(HASH.test(midiSdkHash)&&provider&&sha256(provider)===midiSdkHash,'explicit matching MIDI SDK provider bytes required');
+    assert(!basenames.has('libohmidi.so'),'system libohmidi must not be bundled');midiSdkFacts=audioElfFacts(provider);
+  }
+  const midi=verifyRuntimeMidiFacts({facts:sound,sdkFacts:midiSdkFacts,sdkSha256:midiSdkHash,receipt,
+    declaredBackend:manifest.nativeLibraries[soundPath].javaSoundMidiBackend,capability:caps['javaSound.nativeMidi']});
   return{schemaVersion:1,buildId:receipt.buildId,archiveSha256:receipt.sha256,archiveSizeBytes:receipt.bytes,
     soundPath,soundSha256:sha256(files.get(soundPath)),manifestSha256:sha256(raw),backend:backend.backend,
     minimumApi:20,qualification:backend.qualification,capture:backend.capture,...contract.embedded,sdkProviderSha256:sdkHash,
-    requiredSymbols:used,nativeLibraryCount:nativeNames.length,fileCount:entries.size,scope:AUDIO_AUDIT_SCOPE};
+    requiredSymbols:used,nativeLibraryCount:nativeNames.length,fileCount:entries.size,scope:AUDIO_AUDIT_SCOPE,
+    ...(ports?{ports}:{}),...(midi?{midi}:{})};
 }
 
 /** 激活只消费已完整远端读回的同一 ZIP；新音频收据不能省略或跨包挪用静态验收。 */
@@ -187,7 +222,7 @@ export function validateRuntimeAudioAudit(audit,target,receipt){
   const contract=audioContract(receipt);
   const keys=['schemaVersion','buildId','archiveSha256','archiveSizeBytes','soundPath','soundSha256','manifestSha256',
     'backend','minimumApi','qualification','capture','sdkProviderSha256','requiredSymbols','nativeLibraryCount','fileCount','scope',
-    ...(contract.duplex?['embeddedCallbacks']:[])];
+    ...(contract.duplex?['embeddedCallbacks']:[]),...(requiresRuntimePorts(receipt)?['ports']:[]),...(requiresRuntimeMidi(receipt)?['midi']:[])];
   const expectedPath=(String(receipt.build.major)==='8'?'jre/lib/aarch64/':'lib/')+'libjsound.so';
   assert(requiresRuntimeAudio(receipt)&&audit&&same(Object.keys(audit).sort(),keys.sort())&&audit.schemaVersion===1&&
     audit.buildId===target.buildId&&audit.archiveSha256===target.sha256&&audit.archiveSizeBytes===target.sizeBytes&&
@@ -203,6 +238,8 @@ export function validateRuntimeAudioAudit(audit,target,receipt){
     Number.isSafeInteger(audit.nativeLibraryCount)&&audit.nativeLibraryCount>0&&audit.nativeLibraryCount<=50000&&
     Number.isSafeInteger(audit.fileCount)&&audit.fileCount>audit.nativeLibraryCount&&audit.fileCount<=50000,
     'incomplete runtime audio audit supplier/member proof');
+  if(requiresRuntimePorts(receipt))validateRuntimePortsAudit(audit.ports,receipt);
+  if(requiresRuntimeMidi(receipt))validateRuntimeMidiAudit(audit,receipt);
   return audit;
 }
 

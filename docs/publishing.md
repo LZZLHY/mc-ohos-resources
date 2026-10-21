@@ -11,6 +11,7 @@
 - 新平台/adapter 可以进入结构合法的目录，当前不支持的 HAP 不安装。新主版本须经过构建与验收，不能只修改主版本号。
 - 预览需要新宿主时，可以仅在该槽的 `recommendations.preview` 覆盖 `loaderProtocol`、`minimumApi`、`minimumCatalogProtocol`。通道不能覆盖 runtime 的平台/布局身份；准入下限改变也必须增加该槽推荐代次。宿主协议尚未取得资格时保持不支持，不因目录准备完成就开启新协议。
 - 推荐构建的已验证来源收据含 `0025-ohos-javasound-duplex-host-callbacks.patch` 时，该通道实际投影的 `loaderProtocol` 必须至少为2。共享闭包在上传、签名和激活之前检查这一条件，不能将新宿主回调依赖错误标成旧协议1；只检查通道各自的推荐，旧stable推荐仍可保持1，未推荐的新包不会使stable被迫升级。
+- `0026-ohos-javasound-native-midi.patch` 同样依赖正常加载宿主的typed回调，即使单独推荐该实现也必须协议2。该约束不授权旧HAP调用新回调表。
 - 稳定通道新源码构建必须达到 `device-matrix-tested`，legacy 为兼容迁移例外。当前新包均在预览通道，用户单场景反馈不能冒充设备矩阵。
 
 ## 标准步骤
@@ -55,6 +56,18 @@ node tools/export-clients.mjs --catalog-dir catalog/v1 --app <MyApplication> --w
 不能用当前安装目录的同名文件自动替代历史 SDK，也不把 SDK 二进制公开到源码包。
 静态记录绑定 buildId、完整 ZIP 摘要、libjsound/内层清单摘要、SDK 摘要和实际符号集合；
 完整远端 ZIP 读回成功后才写入发布收据，激活条件门会重新核对这些身份。
+
+含0026的包另要求同一SDK冻结输入中的`libohmidi.so`实物加入上述显式provider map。
+MIDI为API24可选动态供应者，JDK最低API仍为20；禁止运行包`DT_NEEDED`或直接强/弱导入
+OH_MIDI。独立门读取真实只读`.amcl.midi`标记、只读PT_LOAD内14个动态API名，以及14个
+可执行JNI/生命周期函数和一个身份对象；SDK各函数也必须是实际PF_X函数定义。能力为
+`ohmidi-api24-optional-midi1`，不授予外设收发或蓝牙授权资格。
+
+含0027的包要求真实只读`.amcl.ports`标记、8个强音频SDK入口和15个JNI导出。
+能力为`device-ports-requires-device-test`，合同明确`controlsExposed=false`、
+`systemControlWrites=not-public-api`；不能以renderer局部音量伪造系统Control。MIDI与Ports
+各自的精确Backend子记录绑定同一运行ZIP/来源/SDK，并在激活时复核；不接受任意附加的
+device-tested声明。没有对应补丁的历史包保持原字段和无设备范围。
 
 只做本地验证时使用
 `node tools/verify-runtime-audio.mjs --archive <运行ZIP> --receipt <原始manifest.json> --sdk-provider-map <映射> --output <新报告>`。

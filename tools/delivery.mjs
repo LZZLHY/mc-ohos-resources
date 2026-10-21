@@ -8,6 +8,7 @@ import {resolve} from 'node:path';
 import {sha256} from './protocol.mjs';
 import {projectCatalog} from './catalog.mjs';
 import {AUDIO_DUPLEX_PATCH,requiresRuntimeAudio,validateRuntimeAudioAudit} from './runtime-audio.mjs';
+import {requiresRuntimeMidi} from './runtime-midi.mjs';
 
 export const REPOSITORY = 'LZZLHY/mc-ohos-resources';
 const HASH = /^[a-f0-9]{64}$/;
@@ -86,7 +87,7 @@ export function deliveryClosure(sourceRaw, indexRaw, provenanceRaws) {
   // 可编辑说明声称旧协议兼容；每个通道仅检查自己的推荐，不因共用builds列表抬高stable。
   for (const catalog of [stable,preview]) for (const runtime of catalog.runtimes) {
     const receipt = receipts.get(runtime.recommendedBuildId);
-    if (Object.hasOwn(receipt?.build?.patches ?? {}, AUDIO_DUPLEX_PATCH)) {
+    if (Object.hasOwn(receipt?.build?.patches ?? {}, AUDIO_DUPLEX_PATCH) || requiresRuntimeMidi(receipt)) {
       assert(runtime.loaderProtocol >= 2, 'signed host callback requires loader protocol 2: '+
         catalog.channel+'/'+runtime.id+'/'+runtime.recommendedBuildId);
     }

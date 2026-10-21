@@ -10,6 +10,7 @@ import {sha256,signCatalog} from '../tools/protocol.mjs';
 import {projectCatalog} from '../tools/catalog.mjs';
 import {deliveryClosure,validateDeliveryReceipt,githubAsset} from '../tools/delivery.mjs';
 import {AUDIO_DUPLEX_PATCH} from '../tools/runtime-audio.mjs';
+import {MIDI_PATCH} from '../tools/runtime-midi.mjs';
 import {readSourceZip,verifySourceArchive,crc32} from '../tools/source-archive.mjs';
 import {remoteIdentity,validateExistingAssets} from '../tools/publish.mjs';
 import {activateCatalog,assertNoPendingActivation} from '../tools/activation.mjs';
@@ -103,6 +104,12 @@ test('unrecommended duplex build does not change either legacy recommendation',(
   assert(legacy);f.source.builds.push(legacy);
   for(const channel of ['stable','preview'])runtime.recommendations[channel].recommendedBuildId=legacy.id;
   assert.equal(f.closure().targets.length,2);
+});
+test('native MIDI alone still requires the implemented host callback protocol',()=>{
+  const f=fixture();f.receipt.build.patches[MIDI_PATCH]=sha256('synthetic MIDI source');
+  const receiptRaw=raw(f.receipt);f.raws.set(f.build.id,receiptRaw);f.build.provenance.manifestSha256=sha256(receiptRaw);
+  assert.throws(f.closure,/signed host callback requires loader protocol 2/);
+  f.source.runtimes[0].loaderProtocol=2;assert.equal(f.closure().targets.length,2);
 });
 
 for(const [name,change] of [

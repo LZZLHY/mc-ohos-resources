@@ -9,6 +9,7 @@ import {generateKeyPairSync} from 'node:crypto';
 import {sha256,signCatalog} from '../tools/protocol.mjs';
 import {projectCatalog} from '../tools/catalog.mjs';
 import {deliveryClosure,validateDeliveryReceipt,githubAsset} from '../tools/delivery.mjs';
+import {AUDIO_DUPLEX_PATCH} from '../tools/runtime-audio.mjs';
 import {readSourceZip,verifySourceArchive,crc32} from '../tools/source-archive.mjs';
 import {remoteIdentity,validateExistingAssets} from '../tools/publish.mjs';
 import {activateCatalog,assertNoPendingActivation} from '../tools/activation.mjs';
@@ -72,6 +73,36 @@ test('complete source/runtime/receipt closure and ZIP byte inventory',()=>{
   const f=fixture(),c=f.closure();assert.equal(c.targets.length,2);
   assert.equal(verifySourceArchive(f.bytes,c.targets.find(t=>t.kind==='source-inputs'),f.receipt).fileCount,7);
   validateDeliveryReceipt(verification(c),c);
+});
+
+/** 这里只验证来源到推荐准入的绑定；合成补丁收据不冒充实际运行ZIP/源码包音频资格。 */
+function duplexFixture(){
+  const f=fixture();
+  f.receipt.build.patches[AUDIO_DUPLEX_PATCH]=sha256('fixed synthetic duplex patch');
+  const receiptRaw=raw(f.receipt);f.raws.set(f.build.id,receiptRaw);f.build.provenance.manifestSha256=sha256(receiptRaw);
+  return f;
+}
+for(const channel of ['stable','preview']) test('duplex recommendation rejects protocol 1 in '+channel,()=>{
+  const f=duplexFixture(),runtime=f.source.runtimes[0];runtime.loaderProtocol=2;
+  runtime.recommendations[channel].loaderProtocol=1;
+  assert.throws(f.closure,new RegExp('signed host callback requires loader protocol 2: '+channel));
+});
+test('duplex channel overrides satisfy host requirement without raising old stable',()=>{
+  const f=duplexFixture(),runtime=f.source.runtimes[0];runtime.loaderProtocol=1;
+  const legacy=structuredClone(sourceTemplate.builds.find(b=>b.runtimeId===runtime.id&&b.provenance.kind==='legacy'));
+  assert(legacy);f.source.builds.push(legacy);
+  runtime.recommendations.stable.recommendedBuildId=legacy.id;
+  runtime.recommendations.preview.loaderProtocol=2;
+  assert.equal(f.closure().targets.length,2);
+  assert.equal(projectCatalog(f.source,'stable').runtimes[0].loaderProtocol,1);
+  assert.equal(projectCatalog(f.source,'preview').runtimes[0].loaderProtocol,2);
+});
+test('unrecommended duplex build does not change either legacy recommendation',()=>{
+  const f=duplexFixture(),runtime=f.source.runtimes[0];runtime.loaderProtocol=1;
+  const legacy=structuredClone(sourceTemplate.builds.find(b=>b.runtimeId===runtime.id&&b.provenance.kind==='legacy'));
+  assert(legacy);f.source.builds.push(legacy);
+  for(const channel of ['stable','preview'])runtime.recommendations[channel].recommendedBuildId=legacy.id;
+  assert.equal(f.closure().targets.length,2);
 });
 
 for(const [name,change] of [

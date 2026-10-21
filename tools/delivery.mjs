@@ -7,7 +7,7 @@ import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {sha256} from './protocol.mjs';
 import {projectCatalog} from './catalog.mjs';
-import {requiresRuntimeAudio,validateRuntimeAudioAudit} from './runtime-audio.mjs';
+import {AUDIO_DUPLEX_PATCH,requiresRuntimeAudio,validateRuntimeAudioAudit} from './runtime-audio.mjs';
 
 export const REPOSITORY = 'LZZLHY/mc-ohos-resources';
 const HASH = /^[a-f0-9]{64}$/;
@@ -46,7 +46,7 @@ export function validateBuildReceipt(raw, build) {
  */
 export function deliveryClosure(sourceRaw, indexRaw, provenanceRaws) {
   const source = JSON.parse(sourceRaw), index = JSON.parse(indexRaw);
-  const preview = projectCatalog(source,'preview'); projectCatalog(source,'stable');
+  const preview = projectCatalog(source,'preview'), stable = projectCatalog(source,'stable');
   assert(index.schemaVersion === 1 && Array.isArray(index.files) && index.files.length <= 256,
     'invalid source-input index');
   assert(Object.keys(index).every(k => ['schemaVersion','files'].includes(k)), 'unknown source-input index field');
@@ -80,6 +80,15 @@ export function deliveryClosure(sourceRaw, indexRaw, provenanceRaws) {
       // 文件名是 assets-map 的键，也是公开下载的身份；不同 build 不能复用同名资产。
       assert(!names.has(target.fileName), 'duplicate delivery filename: '+target.fileName);
       names.set(target.fileName,target); targets.push(target);
+    }
+  }
+  // 0025实际依赖正常加载宿主的typed回调表。来源收据已绑定完整归档，不能只凭
+  // 可编辑说明声称旧协议兼容；每个通道仅检查自己的推荐，不因共用builds列表抬高stable。
+  for (const catalog of [stable,preview]) for (const runtime of catalog.runtimes) {
+    const receipt = receipts.get(runtime.recommendedBuildId);
+    if (Object.hasOwn(receipt?.build?.patches ?? {}, AUDIO_DUPLEX_PATCH)) {
+      assert(runtime.loaderProtocol >= 2, 'signed host callback requires loader protocol 2: '+
+        catalog.channel+'/'+runtime.id+'/'+runtime.recommendedBuildId);
     }
   }
   targets.sort((a,b) => a.fileName.localeCompare(b.fileName));

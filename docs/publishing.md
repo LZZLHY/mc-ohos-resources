@@ -10,6 +10,7 @@
 - 需要精确回退时，在该通道 recommendations 中增加 `rollback: { "fromBuildIds": ["坏构建ID"], "reason": "已定位的回归与回退原因" }`，生成后位于 runtime.rollback。fromBuildIds 必须属于同一 runtime 且全部标记 withdrawn；两个通道都不能继续推荐撤回构建。修改回退范围/原因也增加 recommendationRevision。撤回 ID 不可复活，修复或更正使用新的 buildId。
 - 新平台/adapter 可以进入结构合法的目录，当前不支持的 HAP 不安装。新主版本须经过构建与验收，不能只修改主版本号。
 - 预览需要新宿主时，可以仅在该槽的 `recommendations.preview` 覆盖 `loaderProtocol`、`minimumApi`、`minimumCatalogProtocol`。通道不能覆盖 runtime 的平台/布局身份；准入下限改变也必须增加该槽推荐代次。宿主协议尚未取得资格时保持不支持，不因目录准备完成就开启新协议。
+- 推荐构建的已验证来源收据含 `0025-ohos-javasound-duplex-host-callbacks.patch` 时，该通道实际投影的 `loaderProtocol` 必须至少为2。共享闭包在上传、签名和激活之前检查这一条件，不能将新宿主回调依赖错误标成旧协议1；只检查通道各自的推荐，旧stable推荐仍可保持1，未推荐的新包不会使stable被迫升级。
 - 稳定通道新源码构建必须达到 `device-matrix-tested`，legacy 为兼容迁移例外。当前新包均在预览通道，用户单场景反馈不能冒充设备矩阵。
 
 ## 标准步骤

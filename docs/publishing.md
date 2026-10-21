@@ -76,6 +76,18 @@ node tools/export-clients.mjs --catalog-dir catalog/v1 --app <MyApplication> --w
 历史派生缺该副本时，可用主工程导出器的 `--repack-recipe` 显式指定原配方，必须
 精确命中旧收据 SHA。当前脚本演进不要求重写旧 ZIP、旧收据或旧资产身份。
 
+现代新增 BDF/PCF 等源文件的 notice 使用字体 bundle schema2 和显式
+`--compiled-inputs <原完整构建的 inputs/project>`。工具从原冻结补丁恢复全部新增
+文件、核对每文件上游 SHA，复制完整原版权/许可注释及匹配版本许可正文，加入
+`legal/amcl-freetype-completion/NOTICE.txt`。这只是原文保全，不代替法律意见。
+已存在的旧包不覆写；补充 notice 后生成新的不可变 buildId/文件名。
+
+notice、其来源清单及生成器在公开源包的 `derivedNoticeFiles` 单列，且必须与
+原 `frozenFiles` 不相交。发布端直接用原冻结补丁与许可逐字节重算 notice，不执行
+源包内脚本；仅更新派生哈希不能掩盖作者、许可、文件清单或版本的改变。源包另带
+可重建的生成器入口 `scripts/freetype-notices.py`；单代源包以 `--major <主版本>`
+只重建该代材料。旧 schema1 字体审计仍保留，不追改其来源为“已有新 notice”。
+
 旧客户端准入可用 `tools/verify-client-admission.mjs --app <MyApplication> --client-ref <真实旧提交> --required-loader-protocol 2 --receipt <外置证据>` 检查。该工具加载指定提交的生产验证器和 Repository，实际验签更高协议目录后核 `supportsRuntime` / `buildFor` 拒绝下载，并先证明旧协议基线仍可用；其结果是宿主协议证据，不能替代旧 HAP 真机安装行为。
 
 ## 回滚与恢复

@@ -5,6 +5,7 @@
  */
 import {isDeepStrictEqual} from 'node:util';
 import {sha256} from './protocol.mjs';
+import {verifyDerivedFreeTypeNotices} from './freetype-notices.mjs';
 
 const assert=(ok,message)=>{if(!ok)throw new Error(message);};
 const HASH=/^[a-f0-9]{64}$/, COMMIT=/^[a-f0-9]{40}$/;
@@ -81,7 +82,7 @@ export function verifyFontSourceChain(files,index,receipt){
   const bundle=JSON.parse(bound('font-provider/input-bundle.json',audit.inputManifestSha256));
   const outer=JSON.parse(bound('font-provider/build-manifest.json',audit.producerBuildManifestSha256));
   const source=JSON.parse(bound('font-provider/source-provenance.json',audit.providerSourceProvenanceSha256));
-  assert(proof.schemaVersion===1 && bundle.schemaVersion===1 && source.schemaVersion===1 &&
+  assert(proof.schemaVersion===1 && [1,2].includes(bundle.schemaVersion) && source.schemaVersion===1 &&
     bundle.provenance?.sha256===audit.provenanceSha256 && outer.state==='completed' && outer.exitCode===0 &&
     outer.component==='fontconfig' && outer.runId===proof.buildId && outer.imageId===proof.builderImageId &&
     outer.inputs?.digest===proof.buildInputDigest && same(outer.inputs.files,proof.recipes) &&
@@ -126,6 +127,7 @@ export function verifyFontSourceChain(files,index,receipt){
   const permitted=new Set([...frozenNames,...sourceNames,'font-provider/provenance.json','font-provider/input-bundle.json',
     'font-provider/build-manifest.json','font-provider/source-provenance.json','font-provider/source-identities.json',
     'font-provider/licenses/fontconfig/COPYING','font-provider/licenses/expat/COPYING','font-provider/README.rebuild.md']);
+  if(audit.derivedNotices)for(const name of ['manifest.json','generator.py','NOTICE.txt'])permitted.add('font-provider/derived-notices/'+name);
   assert(namespace.length===permitted.size && namespace.every(name=>permitted.has(name)),'font namespace contains missing/undeclared source material');
   const required=proof.requiredFreeTypeSymbols;
   assert(Array.isArray(required) && required.length===23 && new Set(required).size===23 &&
@@ -146,6 +148,8 @@ export function verifyFontSourceChain(files,index,receipt){
   const expected={[native+'libfontconfig.so']:{sha256:proof.variants[variant].sha256,bytes:proof.variants[variant].sizeBytes,mode:0o100644},
     'legal/amcl-fontconfig/COPYING':{sha256:sha256(licenses.fontconfig),bytes:licenses.fontconfig.length,mode:0o100644},
     'legal/amcl-expat/COPYING':{sha256:sha256(licenses.expat),bytes:licenses.expat.length,mode:0o100644}};
+  const notice=verifyDerivedFreeTypeNotices(files,index,receipt,bundle);
+  if(notice)expected[notice.path]={sha256:notice.sha256,bytes:notice.bytes,mode:notice.mode};
   assert(audit.variant===variant && audit.referenceFreeTypeDelivered===false && same(audit.additions,expected) &&
     audit.freeTypePath===native+ftName && HASH.test(audit.freeTypeSha256),'font delivered addition/FreeType identity mismatch');
   assert(same(proof.variants[variant].needed,['libc.so',ftName].sort()) ||

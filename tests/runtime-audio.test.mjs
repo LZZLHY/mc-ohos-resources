@@ -10,7 +10,7 @@ import {crc32} from '../tools/source-archive.mjs';
 import {preflightLocalAssets} from '../tools/publish.mjs';
 import {validateDeliveryReceipt} from '../tools/delivery.mjs';
 import {AUDIO_PATCH,AUDIO_MARKER,AUDIO_DUPLEX_PATCH,AUDIO_DUPLEX_MARKER,AUDIO_TIMELINE_PATCH,AUDIO_TIMELINE_MARKER,AUDIO_SDK_PATH,REQUIRED_AUDIO_SYMBOLS,REQUIRED_TIMELINE_AUDIO_SYMBOLS,REQUIRED_CAPTURE_SYMBOLS,audioElfFacts,
-  verifyAudioRuntimeFiles,verifyRuntimeAudioFile,readAudioSdkProviders} from '../tools/runtime-audio.mjs';
+  verifyAudioRuntimeFiles,verifyRuntimeAudioFile,readAudioSdkProviders,verifySoundSymbolClosure} from '../tools/runtime-audio.mjs';
 
 const raw=value=>Buffer.from(JSON.stringify(value));
 const mode=0o100644;
@@ -68,11 +68,12 @@ function zip(files,{deflated=false}={}){
 function fixture({major='17',timeline=false,duplex=timeline,sound={},sdk={},other={},extraFiles=[]}={}){
   const used=[...(timeline?REQUIRED_TIMELINE_AUDIO_SYMBOLS:REQUIRED_AUDIO_SYMBOLS),...(duplex?REQUIRED_CAPTURE_SYMBOLS:[]),'OH_AudioStreamBuilder_Create'].sort();
   const provider=elf({exports:used,soname:'libohaudio.so',...sdk}),sdkHash=sha256(provider);
+  const libc=elf({soname:'libc.so'}),libcHash=sha256(libc);
   const soundPath=(major==='8'?'jre/lib/aarch64/':'lib/')+'libjsound.so';
   const files=new Map([[soundPath,elf({imports:used,needed:['libc.so','libohaudio.so'],marker:true,markerBytes:timeline?AUDIO_TIMELINE_MARKER:duplex?AUDIO_DUPLEX_MARKER:AUDIO_MARKER,...sound})],
     ['lib/libother.so',elf(other)],['release',Buffer.from('synthetic fixture')],...extraFiles]);
   const receipt={buildId:'test-audio-'+major,bytes:0,sha256:'',build:{major,patches:{[AUDIO_PATCH]:sha256('patch'),...(duplex?{[AUDIO_DUPLEX_PATCH]:sha256('duplex-patch')}:{}),...(timeline?{[AUDIO_TIMELINE_PATCH]:sha256('timeline-patch')}:{})},
-    inputClosure:{nativeSdk:{files:{[AUDIO_SDK_PATH]:sdkHash}}}}};
+    inputClosure:{nativeSdk:{files:{[AUDIO_SDK_PATH]:sdkHash,'sysroot/usr/lib/aarch64-linux-ohos/libc.so':libcHash}}}}};
   const manifest={schema:1,buildId:receipt.buildId,build:receipt.build,files:{},nativeLibraries:{},
     capabilities:{'javaSound.nativePcm':duplex?'duplex-requires-permission-and-device-test':'playback-only-requires-device-test','javaSound.nativePlayback':'implemented-requires-device-test',
       'javaSound.nativeCapture':duplex?'implemented-requires-permission-and-device-test':'not-implemented','javaSound.nativeMidi':'unavailable-safe','javaSound.ports':'unavailable-safe'}};
@@ -82,13 +83,13 @@ function fixture({major='17',timeline=false,duplex=timeline,sound={},sdk={},othe
     qualification:'implemented-requires-device-test',capture:duplex?'implemented-requires-permission-and-device-test':'not-implemented',
     ...(duplex?{embeddedCallbacks:timeline?'signed-host-data-abi-v2-required':'signed-host-data-abi-v1-required'}:{}),provider:'libohaudio.so',providerSha256:sdkHash,
     requiredSymbols:manifest.nativeLibraries[soundPath].imports.filter(n=>n.startsWith('OH_Audio'))};
-  const providers=new Map([[sdkHash,provider]]);
+  const providers=new Map([[sdkHash,provider],[libcHash,libc]]);
   const finish=(options={})=>{
     files.set('amcl-runtime.json',raw(manifest));const bytes=zip(files,options);receipt.bytes=bytes.length;receipt.sha256=sha256(bytes);
     return{bytes,target:{buildId:receipt.buildId,kind:'runtime',fileName:'runtime.zip',sizeBytes:bytes.length,sha256:receipt.sha256}};
   };
   const verify=()=>{finish();return verifyAudioRuntimeFiles(files,new Map([...files].map(([n,b])=>[n,{size:b.length,mode}])),receipt,providers);};
-  return{files,receipt,manifest,providers,provider,sdkHash,soundPath,finish,verify};
+  return{files,receipt,manifest,providers,provider,sdkHash,libc,libcHash,soundPath,finish,verify};
 }
 
 for(const major of ['8','17','21','25'])test('audio gate accepts exact '+major+' playback provider and keeps capture unqualified',()=>{
@@ -172,12 +173,66 @@ test('bounded ELF parser rejects corrupt headers, offsets and unterminated strin
     b=>b.fill(255,128,144)]){const b=elf({imports:['a'],marker:true});change(b);assert.throws(()=>audioElfFacts(b));}
 });
 
+function soundClosureFixture(){
+  const sound='lib/libjsound.so',libc=elf({soname:'libc.so'}),hash=sha256(libc);
+  const files=new Map([[sound,elf({imports:['JNU_ThrowByName','JVM_SoundProbe','JNI_SoundProbe','optional_probe'],
+      weak:['optional_probe'],needed:['libc.so']})],
+    ['lib/libjava.so',elf({exports:['JNU_ThrowByName'],needed:['libjvm.so']})],
+    ['lib/server/libjvm.so',elf({exports:['JVM_SoundProbe','JNI_SoundProbe'],needed:['libc.so']})]]);
+  const receipt={build:{inputClosure:{nativeSdk:{files:{'sysroot/usr/lib/aarch64-linux-ohos/libc.so':hash}}}}};
+  const providers=new Map([[hash,libc]]);
+  const verify=()=>verifySoundSymbolClosure(new Map([...files].map(([name,data])=>[name,audioElfFacts(data)])),files,sound,receipt,providers);
+  const linked=()=>files.set(sound,elf({imports:['JNU_ThrowByName','JVM_SoundProbe','JNI_SoundProbe','optional_probe'],
+      weak:['optional_probe'],needed:['libjava.so','libc.so']}));
+  return{sound,files,receipt,providers,verify,linked,hash};
+}
+test('sound JNU/JVM/JNI imports cannot borrow a merely bundled unrelated provider',()=>{
+  const f=soundClosureFixture();assert.throws(f.verify,/no DT_NEEDED supplier:.*JNU_ThrowByName/);
+  f.linked();const proof=f.verify();assert.equal(proof.scope,'libjsound-dt-needed-closure');
+  assert.deepEqual(proof.requiredSymbols,['JNI_SoundProbe','JNU_ThrowByName','JVM_SoundProbe']);
+  assert.equal(proof.suppliers['libjava.so'].path,'lib/libjava.so');assert.equal(proof.suppliers['libjvm.so'].path,'lib/server/libjvm.so');
+});
+test('sound resolver rejects missing transitive JVM supplier and accepts dependency cycles',()=>{
+  const f=soundClosureFixture();f.linked();f.files.set('lib/libjava.so',elf({exports:['JNU_ThrowByName']}));
+  assert.throws(f.verify,/JVM_SoundProbe/);
+  f.files.set('lib/libjava.so',elf({exports:['JNU_ThrowByName'],needed:['libjvm.so']}));
+  f.files.set('lib/server/libjvm.so',elf({exports:['JVM_SoundProbe','JNI_SoundProbe'],needed:['libjava.so','libc.so']}));
+  assert.equal(f.verify().requiredSymbols.length,3);
+});
+for(const key of ['hidden','zero'])test('sound resolver rejects '+key+' real dynamic JNU export',()=>{
+  const f=soundClosureFixture();f.linked();f.files.set('lib/libjava.so',elf({exports:['JNU_ThrowByName'],[key]:['JNU_ThrowByName'],needed:['libjvm.so']}));
+  assert.throws(f.verify,/JNU_ThrowByName/);
+});
+test('sound resolver preserves missing weak optional imports but never inherits JVM host exemption',()=>{
+  const f=soundClosureFixture();f.linked();assert.equal(f.verify().requiredSymbols.length,3);
+  f.files.set(f.sound,elf({imports:['__clear_cache'],needed:['libc.so']}));assert.throws(f.verify,/__clear_cache/);
+});
+test('sound resolver requires exact SDK bytes and unambiguous visited native dependency',()=>{
+  const f=soundClosureFixture();f.linked();f.providers.clear();assert.throws(f.verify,/matching SDK dependency/);
+  const g=soundClosureFixture();g.linked();g.files.set('elsewhere/libjava.so',g.files.get('lib/libjava.so'));
+  assert.throws(g.verify,/ambiguous/);
+});
+test('sound activation refuses old audits without the new dependency proof',()=>{
+  const f=fixture(),d=delivery(f);delete d.receipt.assets[0].runtimeAudio.symbolClosure;
+  assert.throws(()=>validateDeliveryReceipt(d.receipt,d.closure),/runtime audio audit/);
+});
+for(const [name,change] of [
+  ['missing mandatory symbol',p=>p.requiredSymbols.pop()],['wrong root SHA',p=>p.suppliers['libjsound.so'].sha256=sha256('other')],
+  ['SDK source mismatch',p=>p.suppliers['libc.so'].sha256=sha256('other')],['unknown supplier kind',p=>p.suppliers['libc.so'].kind='host'],
+  ['path escape',p=>p.suppliers['libjsound.so'].path='../libjsound.so'],['empty proof',p=>p.requiredSymbols=[]]
+])test('sound activation rejects '+name,()=>{
+  const f=fixture(),d=delivery(f);change(d.receipt.assets[0].runtimeAudio.symbolClosure);
+  assert.throws(()=>validateDeliveryReceipt(d.receipt,d.closure));
+});
+
 async function temp(){const base=resolve(process.env.AMCL_TEST_TMP??tmpdir());await mkdir(base,{recursive:true});return mkdtemp(resolve(base,'runtime-audio-'));}
 
 test('actual STORE/DEFLATE ZIP preflight needs frozen SDK bytes and exact inner identity',async()=>{
-  const dir=await temp(),f=fixture(),providerPath=resolve(dir,'libohaudio.so'),mapPath=resolve(dir,'sdk.json');
-  await writeFile(providerPath,f.provider);await writeFile(mapPath,raw({schemaVersion:1,providers:[{name:'libohaudio.so',sha256:f.sdkHash,path:providerPath}]}));
-  const providers=await readAudioSdkProviders(mapPath);assert.equal(providers.size,1);
+  const dir=await temp(),f=fixture(),providerPath=resolve(dir,'libohaudio.so'),libcPath=resolve(dir,'libc.so'),mapPath=resolve(dir,'sdk.json');
+  await writeFile(providerPath,f.provider);await writeFile(libcPath,f.libc);
+  await writeFile(mapPath,raw({schemaVersion:1,providers:[{name:'libohaudio.so',sha256:f.sdkHash,path:providerPath},
+    {name:'libc.so',sha256:f.libcHash,path:libcPath}]}));
+  const providers=await readAudioSdkProviders(mapPath);assert.equal(providers.size,2);
   for(const deflated of [false,true]){
     const {bytes,target}=f.finish({deflated}),path=resolve(dir,'runtime.zip');await writeFile(path,bytes);
     const closure={targets:[target],receipts:new Map([[target.buildId,f.receipt]])};

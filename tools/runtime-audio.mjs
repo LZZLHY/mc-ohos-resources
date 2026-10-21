@@ -136,12 +136,74 @@ export async function readAudioSdkProviders(path){
     Object.keys(data).every(k=>['schemaVersion','providers'].includes(k)),'invalid audio SDK provider map');
   const result=new Map();
   for(const item of data.providers){
-    assert(['libohaudio.so','libohmidi.so'].includes(item.name)&&HASH.test(item.sha256)&&typeof item.path==='string'&&isAbsolute(item.path)&&
+    assert((['libohaudio.so','libohmidi.so'].includes(item.name)||SYSTEM.has(item.name))&&HASH.test(item.sha256)&&typeof item.path==='string'&&isAbsolute(item.path)&&
       Object.keys(item).every(k=>['name','sha256','path'].includes(k))&&!result.has(item.sha256),'invalid/duplicate audio SDK provider');
     const info=await stat(item.path);assert(info.isFile()&&info.size>0&&info.size<=64*1024*1024,'audio SDK provider size/type invalid');
     const bytes=await readFile(item.path);assert(sha256(bytes)===item.sha256,'audio SDK provider hash mismatch');result.set(item.sha256,bytes);
   }
   return result;
+}
+
+/** 复用已解析的ELF事实沿真实DT_NEEDED解析音频根的强引用。包内无依赖的libjava不能
+ * 作为环境全局符号池；系统库也必须取原构建SDK对应SHA的实际字节。weak和可选MIDI
+ * dlsym名称不进入strongImports，不因此抬高最低API或制造硬依赖。 */
+export function verifySoundSymbolClosure(libraries,files,soundPath,receipt,providers){
+  const byName=new Map();for(const path of libraries.keys()){
+    const name=path.split('/').at(-1);if(!byName.has(name))byName.set(name,[]);byName.get(name).push(path);
+  }
+  const provided=new Set(),visited=new Set(),suppliers={};
+  const visit=name=>{
+    if(visited.has(name))return;visited.add(name);let facts;
+    const candidates=byName.get(name);
+    if(candidates){
+      const path=name===soundPath.split('/').at(-1)?soundPath:candidates.length===1?candidates[0]:undefined;
+      assert(path&&libraries.has(path),'audio dependency supplier basename is ambiguous: '+name);
+      facts=libraries.get(path);const bytes=files.get(path);assert(Buffer.isBuffer(bytes),'audio supplier bytes absent: '+path);
+      suppliers[name]={kind:'bundled',path,sha256:sha256(bytes)};
+    }else{
+      assert(SYSTEM.has(name)||name==='libohaudio.so','audio dependency outside existing system contract: '+name);
+      const hash=receipt.build.inputClosure?.nativeSdk?.files?.['sysroot/usr/lib/aarch64-linux-ohos/'+name];
+      const bytes=providers.get(hash);
+      assert(HASH.test(hash)&&bytes&&sha256(bytes)===hash,'explicit matching SDK dependency bytes required: '+name);
+      facts=audioElfFacts(bytes);assert(facts.soname===name,'audio dependency SDK SONAME mismatch: '+name);
+      suppliers[name]={kind:'sdk',sha256:hash};
+    }
+    for(const symbol of facts.resolvableExports)provided.add(symbol);
+    for(const dependency of facts.needed)visit(dependency);
+  };
+  assert(libraries.has(soundPath),'audio dependency root absent');visit(soundPath.split('/').at(-1));
+  const requiredSymbols=[...libraries.get(soundPath).strongImports];
+  const missing=requiredSymbols.filter(name=>!provided.has(name));
+  assert(missing.length===0,'audio strong import has no DT_NEEDED supplier: '+missing.join(', '));
+  return{scope:'libjsound-dt-needed-closure',requiredSymbols,suppliers};
+}
+
+/** 激活记录必须包含新闭包证明，不能继续消费旧工具漏检时生成的同包旧审计。归档、
+ * manifest和source绑定沿用外层合同；此处不凭记录重新伪造ELF事实或执行目标代码。 */
+function validateSoundSymbolClosureAudit(proof,audit,receipt){
+  assert(proof&&same(Object.keys(proof).sort(),['requiredSymbols','scope','suppliers'])&&proof.scope==='libjsound-dt-needed-closure'&&
+    Array.isArray(proof.requiredSymbols)&&proof.requiredSymbols.length>0&&proof.requiredSymbols.length<=10000&&
+    proof.requiredSymbols.every(name=>typeof name==='string'&&/^[A-Za-z_.$][A-Za-z0-9_.$@]{0,1023}$/.test(name))&&
+    same(proof.requiredSymbols,[...new Set(proof.requiredSymbols)].sort())&&
+    audit.requiredSymbols.every(name=>proof.requiredSymbols.includes(name)),
+    'missing/incomplete audio strong dependency audit');
+  assert(proof.suppliers&&typeof proof.suppliers==='object'&&!Array.isArray(proof.suppliers)&&
+    Object.keys(proof.suppliers).length>0&&Object.keys(proof.suppliers).length<=256,'invalid audio dependency suppliers');
+  const root=proof.suppliers['libjsound.so'];
+  assert(root?.kind==='bundled'&&root.path===audit.soundPath&&root.sha256===audit.soundSha256,'audio dependency root identity mismatch');
+  for(const [name,value] of Object.entries(proof.suppliers)){
+    assert(/^[A-Za-z0-9_.+\-]+$/.test(name)&&value&&HASH.test(value.sha256),'invalid audio dependency supplier identity');
+    if(value.kind==='sdk'){
+      assert(same(Object.keys(value).sort(),['kind','sha256'])&&(SYSTEM.has(name)||name==='libohaudio.so')&&
+        value.sha256===receipt.build.inputClosure?.nativeSdk?.files?.['sysroot/usr/lib/aarch64-linux-ohos/'+name],
+        'audio dependency SDK proof differs from frozen source');
+    }else{
+      assert(value.kind==='bundled'&&same(Object.keys(value).sort(),['kind','path','sha256'])&&
+        typeof value.path==='string'&&!/[\\:\x00-\x1f]/.test(value.path)&&
+        value.path.split('/').every(part=>part&&part!=='.'&&part!=='..')&&value.path.split('/').at(-1)===name,
+        'invalid bundled audio dependency proof');
+    }
+  }
 }
 
 /** files只含经过CRC/清单核对的真实DSO与manifest；entry表覆盖运行ZIP全量名字/尺寸/模式。 */
@@ -164,9 +226,10 @@ export function verifyAudioRuntimeFiles(files,entries,receipt,providers){
   const nativeNames=[...files.keys()].filter(n=>n.split('/').at(-1).includes('.so'));
   assert(same(nativeNames.sort(),Object.keys(manifest.nativeLibraries??{}).sort()),'audio runtime native library set mismatch');
   const basenames=new Set(nativeNames.map(n=>n.split('/').at(-1)));assert(!basenames.has('libohaudio.so'),'system libohaudio must not be shadowed by bundled content');
-  let sound;
+  let sound;const libraries=new Map();
   for(const name of nativeNames){
     const actual=audioElfFacts(files.get(name)),declared=manifest.nativeLibraries[name];
+    libraries.set(name,actual);
     for(const key of ['needed','imports','exports','strongImports','weakImports','resolvableExports'])
       assert(same(actual[key],declared[key]),'audio runtime ELF facts differ from manifest: '+name+' '+key);
     for(const key of ['ohosDaudioMarkers','ohosMidiMarkers','ohosPortsMarkers','ohosMidiDynamicSymbols'])
@@ -210,18 +273,19 @@ export function verifyAudioRuntimeFiles(files,entries,receipt,providers){
   }
   const midi=verifyRuntimeMidiFacts({facts:sound,sdkFacts:midiSdkFacts,sdkSha256:midiSdkHash,receipt,
     declaredBackend:manifest.nativeLibraries[soundPath].javaSoundMidiBackend,capability:caps['javaSound.nativeMidi']});
+  const symbolClosure=verifySoundSymbolClosure(libraries,files,soundPath,receipt,providers);
   return{schemaVersion:1,buildId:receipt.buildId,archiveSha256:receipt.sha256,archiveSizeBytes:receipt.bytes,
     soundPath,soundSha256:sha256(files.get(soundPath)),manifestSha256:sha256(raw),backend:backend.backend,
     minimumApi:20,qualification:backend.qualification,capture:backend.capture,...contract.embedded,sdkProviderSha256:sdkHash,
     requiredSymbols:used,nativeLibraryCount:nativeNames.length,fileCount:entries.size,scope:AUDIO_AUDIT_SCOPE,
-    ...(ports?{ports}:{}),...(midi?{midi}:{})};
+    symbolClosure,...(ports?{ports}:{}),...(midi?{midi}:{})};
 }
 
 /** 激活只消费已完整远端读回的同一 ZIP；新音频收据不能省略或跨包挪用静态验收。 */
 export function validateRuntimeAudioAudit(audit,target,receipt){
   const contract=audioContract(receipt);
   const keys=['schemaVersion','buildId','archiveSha256','archiveSizeBytes','soundPath','soundSha256','manifestSha256',
-    'backend','minimumApi','qualification','capture','sdkProviderSha256','requiredSymbols','nativeLibraryCount','fileCount','scope',
+    'backend','minimumApi','qualification','capture','sdkProviderSha256','requiredSymbols','nativeLibraryCount','fileCount','scope','symbolClosure',
     ...(contract.duplex?['embeddedCallbacks']:[]),...(requiresRuntimePorts(receipt)?['ports']:[]),...(requiresRuntimeMidi(receipt)?['midi']:[])];
   const expectedPath=(String(receipt.build.major)==='8'?'jre/lib/aarch64/':'lib/')+'libjsound.so';
   assert(requiresRuntimeAudio(receipt)&&audit&&same(Object.keys(audit).sort(),keys.sort())&&audit.schemaVersion===1&&
@@ -240,6 +304,7 @@ export function validateRuntimeAudioAudit(audit,target,receipt){
     'incomplete runtime audio audit supplier/member proof');
   if(requiresRuntimePorts(receipt))validateRuntimePortsAudit(audit.ports,receipt);
   if(requiresRuntimeMidi(receipt))validateRuntimeMidiAudit(audit,receipt);
+  validateSoundSymbolClosureAudit(audit.symbolClosure,audit,receipt);
   return audit;
 }
 

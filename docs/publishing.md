@@ -49,11 +49,17 @@ node tools/export-clients.mjs --catalog-dir catalog/v1 --app <MyApplication> --w
 以及录音或设备资格虚报均拒绝。旧包不因新功能加入而重写其原能力或来源记录。
 
 这类包的 `assets` 命令另传 `--sdk-provider-map <sdk-providers.json>`。映射在仓外保存，格式为
-`{"schemaVersion":1,"providers":[{"name":"libohaudio.so","sha256":"<SHA-256>","path":"<绝对路径>"}]}`。
+`{"schemaVersion":1,"providers":[{"name":"libohaudio.so","sha256":"<SHA-256>","path":"<绝对路径>"},{"name":"libc.so","sha256":"<SHA-256>","path":"<绝对路径>"}]}`。
 每份 SDK 实物的 SHA 必须命中原完整构建收据的
 `inputClosure.nativeSdk.files["sysroot/usr/lib/aarch64-linux-ohos/libohaudio.so"]`，
 且其实际 SONAME、可解析导出必须供应该包全部 `OH_Audio*` 导入。可列多个已冻结 SDK，
 不能用当前安装目录的同名文件自动替代历史 SDK，也不把 SDK 二进制公开到源码包。
+音频强引用另沿实际 `DT_NEEDED` 递归核对；`JNU_*`、`JVM_*`、`JNI_*` 及其余强导入都
+必须在该闭包内找到真实可解析定义。包中存在但没有依赖边的 `libjava.so` 不构成供应者。
+provider map 还需提供闭包中实际使用的既有系统库（当前四代包括 `libc.so`），每项仍按
+原 `nativeSdk.files` 摘要核验；系统依赖允许列表不因本门扩大。合法 weak 引用和可选
+MIDI 的动态查询名称不被提升为强依赖。新审计包含 `symbolClosure` 的精确符号和供应者
+身份，激活拒绝缺少此字段的旧审计；历史有效包保持原字节，通过新工具重新读回生成新报告。
 静态记录绑定 buildId、完整 ZIP 摘要、libjsound/内层清单摘要、SDK 摘要和实际符号集合；
 完整远端 ZIP 读回成功后才写入发布收据，激活条件门会重新核对这些身份。
 

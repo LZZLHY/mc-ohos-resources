@@ -6,6 +6,7 @@
 import {inflateRawSync} from 'node:zlib';
 import {isDeepStrictEqual} from 'node:util';
 import {sha256} from './protocol.mjs';
+import {verifyFontSourceChain} from './font-source.mjs';
 
 const assert=(ok,message)=>{if(!ok)throw new Error(message);};
 const HASH=/^[a-f0-9]{64}$/;
@@ -107,7 +108,7 @@ export function verifySourceArchive(bytes,target,receipt) {
     assert(isDeepStrictEqual(index.frozenFiles,outer.inputs.files),'source ZIP frozen input set differs from build');
     if(receipt.derivation){
       const d=receipt.derivation,originalRaw=files.get('original-build-receipt.json'),providerRaw=files.get('provider-provenance.json');
-      assert(d.kind==='compatible-cxx-provider-repack' && originalRaw && providerRaw &&
+      assert(['compatible-cxx-provider-repack','compatible-cxx-font-provider-repack'].includes(d.kind) && originalRaw && providerRaw &&
         sha256(originalRaw)===d.originalReceiptSha256 && sha256(providerRaw)===d.providerProvenanceSha256,
         'source ZIP lacks original/provider derivation receipts');
       const provider=JSON.parse(providerRaw),original=JSON.parse(originalRaw);
@@ -125,6 +126,9 @@ export function verifySourceArchive(bytes,target,receipt) {
       const providerOuter=JSON.parse(files.get('provider-build-manifest.json')??'null');
       assert(providerOuter?.state==='completed' && providerOuter.exitCode===0 && providerOuter.imageId===provider.builderImageId &&
         isDeepStrictEqual(providerOuter.unwindInputs,provider.source),'source ZIP provider build receipt mismatch');
+      if(d.kind==='compatible-cxx-font-provider-repack')verifyFontSourceChain(files,index,receipt);
+      else assert(!d.fontBundle && Object.keys(index.fontProviderFiles??{}).length===0 &&
+        ![...files.keys()].some(name=>name.startsWith('font-provider/')),'C++only source cannot conceal font derivation');
     }
   }
   return {manifestSha256:target.manifestSha256,indexSha256:sha256(indexRaw),fileCount:files.size};

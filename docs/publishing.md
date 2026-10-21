@@ -58,6 +58,24 @@ node tools/export-clients.mjs --catalog-dir catalog/v1 --app <MyApplication> --w
 
 若仅以已审核的兼容 provider 更新 CLI，用主工程 `scripts/repack-runtime-provider.py` 生成新的 buildId/文件名：原 ZIP 和内外收据、完整文件集/模式、ELF/依赖先校验，替换后再跑完整 image 门。派生收据同时绑定原 ZIP、原 manifest、provider 来源及再封包配方。HAP 二次 strip 后的摘要与 CLI 使用的已审核输入摘要分开；不能机械要求相等，也不能放宽到只看库名。源码导出时再给 `--derivation-inputs` 和 `--provider-build-root`，补入原始收据、provider 源码/补丁、精确 SDK 输入清单及配方。任何尚未完成的功能、设备许可或性能项不能由该静态重打包门授予 PASS。
 
+增加字体 provider 时使用主工程的显式 `--font-bundle` 输入，派生类型为
+`compatible-cxx-font-provider-repack`。每份包只新增对应 classic/modern 依赖名的
+`libfontconfig.so`、Fontconfig 与静态 Expat 两份原始许可；现代 FreeType 必须来自
+该 JDK 的完整重建，不允许用参考 FreeType 替换。来源收据绑定实际 23 个 FT 导入、
+原包 FT 摘要、SONAME 与依赖供应者。它没有授予独立 CLI 或缓存性能资格。
+
+字体源码导出另给 `--fontconfig-build-root`，把同次成功构建的冻结配方、完整 SDK
+身份索引、Fontconfig/Expat/参考 FreeType 原归档、Meson/gperf 工具归档及许可放在
+独立 `font-provider/` 空间，避免覆盖 JDK 构建当时消费的同名共享脚本。参考 FreeType
+源码是构建参考材料，运行包不交付其二进制。源码验证器检查完整命名空间、内外收据、
+归档 SHA、Git TAR 的提交注记和许可原文；现代 JDK 还要求对应 FT 补全清单、patch
+及许可证属于该次真实冻结输入。只放宽派生 kind、补一份无来源的许可、把补充材料
+冒称冻结输入或遗漏依赖供应者均不能通过。
+
+旧 `compatible-cxx-provider-repack` 继续兼容。新派生保存执行时的再封包配方原件；
+历史派生缺该副本时，可用主工程导出器的 `--repack-recipe` 显式指定原配方，必须
+精确命中旧收据 SHA。当前脚本演进不要求重写旧 ZIP、旧收据或旧资产身份。
+
 旧客户端准入可用 `tools/verify-client-admission.mjs --app <MyApplication> --client-ref <真实旧提交> --required-loader-protocol 2 --receipt <外置证据>` 检查。该工具加载指定提交的生产验证器和 Repository，实际验签更高协议目录后核 `supportsRuntime` / `buildFor` 拒绝下载，并先证明旧协议基线仍可用；其结果是宿主协议证据，不能替代旧 HAP 真机安装行为。
 
 ## 回滚与恢复

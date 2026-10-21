@@ -7,6 +7,7 @@ import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {sha256} from './protocol.mjs';
 import {projectCatalog} from './catalog.mjs';
+import {requiresRuntimeAudio,validateRuntimeAudioAudit} from './runtime-audio.mjs';
 
 export const REPOSITORY = 'LZZLHY/mc-ohos-resources';
 const HASH = /^[a-f0-9]{64}$/;
@@ -115,6 +116,9 @@ export function validateDeliveryReceipt(receipt, closure, now=Date.now()) {
     if (target.kind === 'source-inputs') assert(asset.sourceInputs?.manifestSha256 === target.manifestSha256 &&
       HASH.test(asset.sourceInputs.indexSha256) && Number.isSafeInteger(asset.sourceInputs.fileCount) &&
       asset.sourceInputs.fileCount > 0, 'missing validated source-input contents: '+target.buildId);
+    const buildReceipt=closure.receipts.get(target.buildId);
+    if(target.kind==='runtime'&&requiresRuntimeAudio(buildReceipt))validateRuntimeAudioAudit(asset.runtimeAudio,target,buildReceipt);
+    else assert(asset.runtimeAudio===undefined,'unexpected audio audit on historical runtime or source archive');
   }
   return receipt;
 }

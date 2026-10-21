@@ -11,6 +11,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {readDeliveryClosure,validateDeliveryReceipt,REPOSITORY} from './delivery.mjs';
 import {verifySourceArchive} from './source-archive.mjs';
+import {readAudioSdkProviders,requiresRuntimeAudio,verifyRuntimeAudioFile} from './runtime-audio.mjs';
 import {activateCatalog,assertNoPendingActivation} from './activation.mjs';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -45,6 +46,27 @@ export function validateExistingAssets(releases,targets){
   }
 }
 
+/** 本地全量门独立可测；全部通过之后，调用者才可读取或修改远端 Release。 */
+export async function preflightLocalAssets(closure,map,sdkProviderMap){
+  const sources=new Map(),audio=new Map();
+  const providers=await readAudioSdkProviders(sdkProviderMap);
+  for(const target of closure.targets){
+    const path=map[target.fileName];
+    if(typeof path!=='string'||!isAbsolute(path)||basename(path)!==target.fileName)throw Error('local absolute filename mismatch: '+target.fileName);
+    const buildReceipt=closure.receipts.get(target.buildId);
+    if(target.kind==='runtime'&&requiresRuntimeAudio(buildReceipt)){
+      // 音频门自行从同一文件句柄核完整 SHA、ZIP、ELF 和原 SDK 供应者。
+      audio.set(target.fileName,await verifyRuntimeAudioFile(path,target,buildReceipt,providers));
+    }else{
+      const actual=await fileIdentity(path);
+      if(actual.sizeBytes!==target.sizeBytes||actual.sha256!==target.sha256)throw Error('local identity mismatch '+target.fileName);
+    }
+    if(target.kind==='source-inputs')sources.set(target.fileName,
+      verifySourceArchive(await readFile(path),target,buildReceipt));
+  }
+  return{sources,audio};
+}
+
 export async function main(args=process.argv.slice(2)){
   const option=name=>{const i=args.indexOf('--'+name);return i<0?undefined:args[i+1];};
   const required=name=>{const value=option(name);if(!value)throw Error('--'+name+' required');return value;};
@@ -62,15 +84,7 @@ export async function main(args=process.argv.slice(2)){
     const out=resolve(required('receipt')),map=JSON.parse(await readFile(required('assets-map'),'utf8'));
     // 任何本地缺项、来源正文不符或旧 receipt 路径均在第一次网络修改前发现。
     try{await readFile(out);throw Error('receipt already exists; use a new output path');}catch(error){if(error.code!=='ENOENT')throw error;}
-    const contents=new Map();
-    for(const target of closure.targets){
-      const path=map[target.fileName];
-      if(typeof path!=='string'||!isAbsolute(path)||basename(path)!==target.fileName)throw Error('local absolute filename mismatch: '+target.fileName);
-      const actual=await fileIdentity(path);
-      if(actual.sizeBytes!==target.sizeBytes||actual.sha256!==target.sha256)throw Error('local identity mismatch '+target.fileName);
-      if(target.kind==='source-inputs')contents.set(target.fileName,
-        verifySourceArchive(await readFile(path),target,closure.receipts.get(target.buildId)));
-    }
+    const contents=await preflightLocalAssets(closure,map,option('sdk-provider-map'));
     const releases=JSON.parse(gh('api','--paginate','--slurp','repos/'+REPOSITORY+'/releases?per_page=100')).flat();
     validateExistingAssets(releases,closure.targets);
     for(const tag of new Set(closure.targets.map(t=>t.tag))){
@@ -92,7 +106,8 @@ export async function main(args=process.argv.slice(2)){
     for(const target of closure.targets){
       const verified=await remoteIdentity(target.url,target);
       receipt.assets.push({...verified,fileName:target.fileName,buildId:target.buildId,kind:target.kind,
-        ...(target.kind==='source-inputs'?{sourceInputs:contents.get(target.fileName)}:{})});
+        ...(target.kind==='source-inputs'?{sourceInputs:contents.sources.get(target.fileName)}:{}),
+        ...(contents.audio.has(target.fileName)?{runtimeAudio:contents.audio.get(target.fileName)}:{})});
       console.log('Verified '+target.fileName);
     }
     if((await readDeliveryClosure(root)).closureSha256!==closure.closureSha256)throw Error('delivery inputs changed during asset publication');

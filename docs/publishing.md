@@ -40,6 +40,27 @@ node tools/export-clients.mjs --catalog-dir catalog/v1 --app <MyApplication> --w
 
 上传前完整读取所有本地运行包与源码包。源码 ZIP 另核规范路径、唯一条目、普通文件、中央目录/本地头、CRC、有界展开、每个源文件摘要、内层索引精确集合及嵌入构建收据。新完整构建必须使用冻结输入 schema2；旧已发布 schema1 只保留导出器当时未纳入摘要的 README 例外。源码、运行包都必须全量远端读回，新的 schema2 发布收据缺任一项、重复项、内容校验记录或精确来源身份都会拒绝激活。旧 schema1 发布收据不能直接拿来激活新目录，应重新只读回验并生成新收据。
 
+来源含 `0023-ohos-javasound-daudio-playback.patch` 的新音频包，在首次远端操作前还须通过
+独立运行 ZIP 门。该门从实际 ELF 读取 `.amcl.daudio` 标记、只读加载映射、强导入、
+`DT_NEEDED` 和全部原生库清单，逐项核对包内能力声明。只有 `libjsound.so` 可新增
+`libohaudio.so` 依赖；未知系统依赖、包内同名 SDK 库、普通字符串冒充标记、弱化的必需导入
+以及录音或设备资格虚报均拒绝。旧包不因新功能加入而重写其原能力或来源记录。
+
+这类包的 `assets` 命令另传 `--sdk-provider-map <sdk-providers.json>`。映射在仓外保存，格式为
+`{"schemaVersion":1,"providers":[{"name":"libohaudio.so","sha256":"<SHA-256>","path":"<绝对路径>"}]}`。
+每份 SDK 实物的 SHA 必须命中原完整构建收据的
+`inputClosure.nativeSdk.files["sysroot/usr/lib/aarch64-linux-ohos/libohaudio.so"]`，
+且其实际 SONAME、可解析导出必须供应该包全部 `OH_Audio*` 导入。可列多个已冻结 SDK，
+不能用当前安装目录的同名文件自动替代历史 SDK，也不把 SDK 二进制公开到源码包。
+静态记录绑定 buildId、完整 ZIP 摘要、libjsound/内层清单摘要、SDK 摘要和实际符号集合；
+完整远端 ZIP 读回成功后才写入发布收据，激活条件门会重新核对这些身份。
+
+只做本地验证时使用
+`node tools/verify-runtime-audio.mjs --archive <运行ZIP> --receipt <原始manifest.json> --sdk-provider-map <映射> --output <新报告>`。
+该命令不上传或激活。后端静态状态限定为 API 20 起的
+`implemented-requires-device-test` 播放实现，capture 为 `not-implemented`；
+真机播放、关闭恢复、默认 ProcessBuilder 和整套性能仍须各自的实际证据，不能由静态门授予资格。
+
 激活先验证两个候选签名、源投影、完整资产收据和前后代次，再保存外置事务的旧/新原件，并逐文件原子替换。`catalog/.activation-pending.json` 存在时禁止签名、常规检查及消费者导出。若第一文件替换后中断，用完全相同的 `activate` 参数重跑；只有当前文件分别等于已记旧件或新件、输入闭包和候选没有变化，才能补齐同批并清除标记。不要手工删标记或将半批推送。日志准备阶段失败且尚无 pending 标记时旧目录未被更改，保留失败目录并使用新的事务目录。文件同步和恢复测试不是硬件断电持久化或两个远程 URL 同时切换的保证，最终仍须 Git 同批提交与远端读回。
 
 自有源验收用 `node tools/publish.mjs verify-web --receipt <new-web-receipt.json>` 完整读回所有 web 包；同时检查 HEAD 长度、Range 206、ETag/304 和签名 JSON 一致。上传成功不等于读回验收。

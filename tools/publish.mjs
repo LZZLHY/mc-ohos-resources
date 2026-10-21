@@ -1,88 +1,112 @@
 #!/usr/bin/env node
 /**
- * 不可变资产池发布器：核对本地 → 上传缺失资产 → 远端完整回读 → 生成发布收据。
- * 已存在资产永不 clobber。JSON 由独立签名工具生成，只有收据完整的目录才允许激活。
- * assets-map 是调用者仓外的 filename→绝对本地路径 JSON；不把维护者盘符提交进公开仓。
+ * 不可变资产交付：完整本地闭包 → 上传缺失资产 → 全量远端读回 → 外置收据。
+ * activate 复用同一闭包检查并以可恢复事务替换签名目录；本工具从不覆盖已有远端资产。
  */
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {resolve,dirname,basename} from 'node:path';
+import {resolve,dirname,basename,isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {validateCatalog,validateTransition,verifyEnvelope,sha256} from './protocol.mjs';
-import {projectCatalog} from './catalog.mjs';
+import {readDeliveryClosure,validateDeliveryReceipt,REPOSITORY} from './delivery.mjs';
+import {verifySourceArchive} from './source-archive.mjs';
+import {activateCatalog,assertNoPendingActivation} from './activation.mjs';
+
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
-const args=process.argv.slice(2),option=name=>{const i=args.indexOf('--'+name);return i<0?undefined:args[i+1];};
-const required=name=>{const v=option(name);if(!v)throw Error('--'+name+' required');return v;};
-const repo='LZZLHY/mc-ohos-resources',tag='ohos-runtimes';
 const stamp=()=>new Date().toISOString();
-/** 参数数组传递给 gh/ssh；不把 JSON 或外部字符串拼接为 shell。 */
-function gh(...parameters){const r=spawnSync('gh',parameters,{encoding:'utf8',maxBuffer:8*1024*1024});if(r.status!==0)throw Error(r.stderr||'gh failed');return r.stdout;}
-async function fileIdentity(path){const hash=createHash('sha256');let size=0;for await(const chunk of createReadStream(path)){size+=chunk.length;hash.update(chunk);}return{sizeBytes:size,sha256:hash.digest('hex')};}
-/** 远端完整读回而不是只信任上传返回值；接收上限为已签名大小，多一个字节也失败。 */
-async function remoteIdentity(url,expected){
-  const response=await fetch(url,{redirect:'follow',signal:AbortSignal.timeout(600000)});
+
+/** 不经过 shell 拼接，GitHub 凭据只由现有 gh 登录环境读取。 */
+function gh(...parameters){const r=spawnSync('gh',parameters,{encoding:'utf8',maxBuffer:32*1024*1024});if(r.status!==0)throw Error(r.stderr||'gh failed');return r.stdout;}
+export async function fileIdentity(path){const hash=createHash('sha256');let size=0;for await(const chunk of createReadStream(path)){size+=chunk.length;hash.update(chunk);}return{sizeBytes:size,sha256:hash.digest('hex')};}
+
+/** 接收过程中限制长度；成功要求读到 EOF 后完整 SHA 相同，HEAD/上传返回值不能替代。 */
+export async function remoteIdentity(url,expected,fetcher=fetch){
+  const response=await fetcher(url,{redirect:'follow',signal:AbortSignal.timeout(600000)});
   if(!response.ok||!response.body)throw Error('remote asset HTTP '+response.status+' '+url);
   const hash=createHash('sha256');let size=0;
   for await(const chunk of response.body){size+=chunk.length;if(size>expected.sizeBytes)throw Error('remote asset too large');hash.update(chunk);}
   const actual=hash.digest('hex');if(size!==expected.sizeBytes||actual!==expected.sha256)throw Error('remote identity mismatch '+url);
   return{url,sizeBytes:size,sha256:actual,verifiedAt:stamp()};
 }
-async function main(){
-  const source=JSON.parse(await readFile(resolve(root,'catalog/source.json'),'utf8'));
-  const catalog=projectCatalog(source,'preview');validateCatalog(catalog);
-  if(args[0]==='assets'){
-    const map=JSON.parse(await readFile(required('assets-map'),'utf8'));
-    const sourceInputs=JSON.parse(await readFile(resolve(root,'provenance/build-inputs.json')));
-    const targets=sourceInputs.files.map(s=>({id:s.runtimeBuildId+'-source',archive:s,downloads:[{sourceId:'github',url:s.url}]}))
-      .concat(catalog.builds.filter(b=>b.provenance.kind==='source-build'));
-    for(const b of targets){
-      if(basename(map[b.archive.fileName])!==b.archive.fileName)throw Error('local filename mismatch');
-      const actual=await fileIdentity(map[b.archive.fileName]);if(actual.sizeBytes!==b.archive.sizeBytes||actual.sha256!==b.archive.sha256)throw Error('local identity mismatch '+b.id);
-    }
-    // 标签存在且被锁为 immutable 时不能追加，明确失败后改用新批次统一 Release。
-    let release;
-    const list=JSON.parse(gh('api','repos/'+repo+'/releases?per_page=100'));
-    release=list.find(r=>r.tag_name===tag);
-    if(!release){
-      gh('release','create',tag,'--repo',repo,'--prerelease','--title','OHOS runtimes · 统一资产池','--notes-file',resolve(root,'docs/unified-release-notes.md'));
-      release=JSON.parse(gh('api','repos/'+repo+'/releases/tags/'+tag));
-    }
-    for(const b of targets){
-      const asset=release.assets.find(a=>a.name===b.archive.fileName);
-      if(!asset){if(release.immutable)throw Error('Release immutable; use a new batch tag');console.log('Uploading '+b.archive.fileName);gh('release','upload',tag,map[b.archive.fileName],'--repo',repo);}
-    }
-    const receipt={schemaVersion:1,verificationStartedAt:stamp(),sourceSha256:sha256(await readFile(resolve(root,'catalog/source.json'))),assets:[]};
-    for(const b of targets){const d=b.downloads.find(d=>d.sourceId==='github');receipt.assets.push(await remoteIdentity(d.url,b.archive));console.log('Verified '+b.archive.fileName);}
-    receipt.finishedAt=stamp();const out=resolve(required('receipt'));await mkdir(dirname(out),{recursive:true});await writeFile(out,JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});return;
+
+/** 先检查所有现有资产冲突，避免前面上传成功后才发现本批后面的同名旧件不同。 */
+export function validateExistingAssets(releases,targets){
+  for(const target of targets){
+    const release=releases.find(r=>r.tag_name===target.tag);
+    if(!release)continue;
+    if(release.draft)throw Error('release is draft: '+target.tag);
+    const assets=release.assets.filter(a=>a.name===target.fileName);
+    if(assets.length>1)throw Error('duplicate remote asset name: '+target.fileName);
+    const asset=assets[0];
+    if(asset && (asset.size!==target.sizeBytes ||
+      (asset.digest && asset.digest!=='sha256:'+target.sha256)))throw Error('immutable remote asset identity conflict: '+target.fileName);
+    if(!asset && release.immutable)throw Error('Release immutable; register a new batch tag and new URLs before uploading');
   }
+}
+
+export async function main(args=process.argv.slice(2)){
+  const option=name=>{const i=args.indexOf('--'+name);return i<0?undefined:args[i+1];};
+  const required=name=>{const value=option(name);if(!value)throw Error('--'+name+' required');return value;};
   if(args[0]==='activate'){
-    const keys=JSON.parse(await readFile(resolve(root,'catalog/trusted-keys.json')));
-    const candidate=resolve(required('catalog-dir'));
-    const receipt=JSON.parse(await readFile(required('receipt')));
-    if(receipt.sourceSha256!==sha256(await readFile(resolve(root,'catalog/source.json'))))throw Error('source changed since asset verification');
-    for(const b of catalog.builds.filter(b=>b.provenance.kind==='source-build')){
-      if(!receipt.assets.some(a=>a.sha256===b.archive.sha256&&a.sizeBytes===b.archive.sizeBytes&&a.url===b.downloads.find(d=>d.sourceId==='github').url))throw Error('missing asset receipt '+b.id);
+    const journal=await activateCatalog({root,candidateDir:resolve(required('catalog-dir')),
+      receiptPath:resolve(required('receipt')),transactionDir:resolve(required('transaction-dir'))});
+    console.log('Activated and read back both local channels. Transaction: '+journal.closureSha256+'. Commit/push these exact files, then verify remote channels.');return;
+  }
+  await assertNoPendingActivation(root);
+  const closure=await readDeliveryClosure(root);
+  if(args[0]==='check'){
+    console.log(`Delivery closure valid: ${closure.targets.length} runtime/source assets, ${closure.closureSha256}`);return;
+  }
+  if(args[0]==='assets'){
+    const out=resolve(required('receipt')),map=JSON.parse(await readFile(required('assets-map'),'utf8'));
+    // 任何本地缺项、来源正文不符或旧 receipt 路径均在第一次网络修改前发现。
+    try{await readFile(out);throw Error('receipt already exists; use a new output path');}catch(error){if(error.code!=='ENOENT')throw error;}
+    const contents=new Map();
+    for(const target of closure.targets){
+      const path=map[target.fileName];
+      if(typeof path!=='string'||!isAbsolute(path)||basename(path)!==target.fileName)throw Error('local absolute filename mismatch: '+target.fileName);
+      const actual=await fileIdentity(path);
+      if(actual.sizeBytes!==target.sizeBytes||actual.sha256!==target.sha256)throw Error('local identity mismatch '+target.fileName);
+      if(target.kind==='source-inputs')contents.set(target.fileName,
+        verifySourceArchive(await readFile(path),target,closure.receipts.get(target.buildId)));
     }
-    const raws=[];
-    for(const channel of ['stable','preview']){
-      const raw=await readFile(resolve(candidate,channel+'.json'));
-      const decoded=verifyEnvelope(raw.toString(),keys,channel);
-      if(JSON.stringify(decoded)!==JSON.stringify(projectCatalog(source,channel)))throw Error('signed candidate differs from source');raws.push([channel,raw]);
-      const oldPath=resolve(root,'catalog/v1',channel+'.json');
-      try{const old=await readFile(oldPath,'utf8');validateTransition(verifyEnvelope(old,keys,channel,Date.now(),true),decoded);}
-      catch(error){if(error.code!=='ENOENT')throw error;}
+    const releases=JSON.parse(gh('api','--paginate','--slurp','repos/'+REPOSITORY+'/releases?per_page=100')).flat();
+    validateExistingAssets(releases,closure.targets);
+    for(const tag of new Set(closure.targets.map(t=>t.tag))){
+      if(!releases.some(r=>r.tag_name===tag)){
+        gh('release','create',tag,'--repo',REPOSITORY,'--prerelease','--title','OHOS runtimes · '+tag,
+          '--notes-file',resolve(root,'docs/unified-release-notes.md'));
+        releases.push(JSON.parse(gh('api','repos/'+REPOSITORY+'/releases/tags/'+tag)));
+      }
     }
-    await mkdir(resolve(root,'catalog/v1'),{recursive:true});
-    for(const [channel,raw] of raws)await writeFile(resolve(root,'catalog/v1',channel+'.json'),raw);
-    console.log('Activated verified local catalog files. Commit and push these exact bytes; mirror the same files.');return;
+    for(const target of closure.targets){
+      const release=releases.find(r=>r.tag_name===target.tag);
+      if(!release.assets.some(a=>a.name===target.fileName)){
+        console.log('Uploading '+target.fileName);
+        gh('release','upload',target.tag,map[target.fileName],'--repo',REPOSITORY);
+      }
+    }
+    const receipt={schemaVersion:2,verificationStartedAt:stamp(),sourceSha256:closure.sourceSha256,
+      sourceInputsIndexSha256:closure.sourceInputsIndexSha256,closureSha256:closure.closureSha256,assets:[]};
+    for(const target of closure.targets){
+      const verified=await remoteIdentity(target.url,target);
+      receipt.assets.push({...verified,fileName:target.fileName,buildId:target.buildId,kind:target.kind,
+        ...(target.kind==='source-inputs'?{sourceInputs:contents.get(target.fileName)}:{})});
+      console.log('Verified '+target.fileName);
+    }
+    if((await readDeliveryClosure(root)).closureSha256!==closure.closureSha256)throw Error('delivery inputs changed during asset publication');
+    receipt.finishedAt=stamp();validateDeliveryReceipt(receipt,closure);
+    await mkdir(dirname(out),{recursive:true});await writeFile(out,JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});return;
   }
   if(args[0]==='verify-web'){
-    const receipt={schemaVersion:1,verificationStartedAt:stamp(),sourceSha256:sha256(await readFile(resolve(root,'catalog/source.json'))),assets:[]};
-    for(const b of catalog.builds){const d=b.downloads.find(d=>d.sourceId==='web');if(d){receipt.assets.push(await remoteIdentity(d.url,b.archive));console.log('Verified web '+b.archive.fileName);}}
-    receipt.finishedAt=stamp();await writeFile(resolve(required('receipt')),JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});return;
+    const receipt={schemaVersion:1,verificationStartedAt:stamp(),sourceSha256:closure.sourceSha256,assets:[]};
+    for(const build of closure.source.builds){const download=build.downloads.find(d=>d.sourceId==='web');
+      if(download){if(download.transport!=='single-file')throw Error('web verification requires full-file transport');
+        receipt.assets.push(await remoteIdentity(download.url,build.archive));console.log('Verified web '+build.archive.fileName);}}
+    receipt.finishedAt=stamp();const out=resolve(required('receipt'));await mkdir(dirname(out),{recursive:true});
+    await writeFile(out,JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});return;
   }
-  throw Error('Use assets, activate or verify-web');
+  throw Error('Use check, assets, activate or verify-web');
 }
-main().catch(error=>{console.error(error.message);process.exitCode=1;});
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(error=>{console.error(error.message);process.exitCode=1;});

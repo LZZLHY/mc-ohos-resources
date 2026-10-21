@@ -8,6 +8,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generateKeyPairSync } from 'node:crypto';
 import { validateCatalog, validateTransition, signCatalog, verifyEnvelope } from './protocol.mjs';
+import { assertNoPendingActivation } from './activation.mjs';
+import { readDeliveryClosure } from './delivery.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -18,6 +20,13 @@ const output = async (path,value,exclusive=false) => { await mkdir(dirname(path)
 
 /** 源中每条 runtime 保存两个推荐，生成时投影为一个通道，包身份不复制维护。 */
 export function projectCatalog(source,channel) {
+  // 通道只允许改变推荐和显式准入下限；禁止 spread 意外覆盖 runtime 身份。
+  for (const r of source.runtimes) for (const name of ['stable','preview']) {
+    const recommendation=r.recommendations?.[name];
+    if (!recommendation || Object.keys(recommendation).some(k => ![
+      'recommendedBuildId','recommendationRevision','rollback','minimumCatalogProtocol','minimumApi','loaderProtocol'
+    ].includes(k))) throw new Error('invalid channel recommendation: '+r.id+'/'+name);
+  }
   const c = { schemaVersion:1,catalogRevision:source.catalogRevision,channel,issuedAt:source.issuedAt,expiresAt:source.expiresAt,
     runtimes:source.runtimes.map(r => { const {recommendations,...identity}=r; return {...identity,...recommendations[channel]}; }), builds:source.builds };
   validateCatalog(c,channel);
@@ -30,6 +39,7 @@ export function projectCatalog(source,channel) {
 
 async function main() {
   const command = args[0] || 'check';
+  await assertNoPendingActivation(root);
   if (command === 'keygen') {
     const privatePath = resolve(required('key'));
     if (privatePath.startsWith(root + '/') || privatePath.startsWith(root + '\\')) throw new Error('private key must be outside public repository');
@@ -44,9 +54,10 @@ async function main() {
     const c = verifyEnvelope(await readFile(required('input'),'utf8'),await json(option('keys') || resolve(root,'catalog/trusted-keys.json')),option('channel'));
     console.log(`${c.channel} revision ${c.catalogRevision}: verified`); return;
   }
-  const source = await json(option('source') || resolve(root,'catalog/source.json'));
+  const closure = await readDeliveryClosure(root,option('source'));
+  const source = closure.source;
   const catalogs = ['stable','preview'].map(channel => projectCatalog(source,channel));
-  if (command === 'check') { console.log('Catalog source: both channels valid'); return; }
+  if (command === 'check') { console.log('Catalog source: both channels and source-input closure valid'); return; }
   if (command !== 'generate') throw new Error('Unknown command');
   const key = await readFile(required('key'),'utf8');
   const keys = await json(option('keys') || resolve(root,'catalog/trusted-keys.json'));

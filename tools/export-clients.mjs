@@ -4,13 +4,18 @@ import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {verifyEnvelope,sha256} from './protocol.mjs';
+import {assertNoPendingActivation} from './activation.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2),option=name=>{const i=args.indexOf('--'+name);return i<0?undefined:args[i+1];};
 const catalogDir=resolve(option('catalog-dir')||resolve(root,'catalog/v1'));
+await assertNoPendingActivation(root);
 const keysBytes=await readFile(resolve(root,'catalog/trusted-keys.json'));
 const keys=JSON.parse(keysBytes);
 const stableRaw=await readFile(resolve(catalogDir,'stable.json'));
 const stable=verifyEnvelope(stableRaw.toString(),keys,'stable');
+// 在任何消费者写入前验证另一个通道，避免随后发现 preview 损坏而留下半批副本。
+const previewRaw=await readFile(resolve(catalogDir,'preview.json'));
+verifyEnvelope(previewRaw.toString(),keys,'preview');
 if(option('app')){
   const out=resolve(option('app'),'entry/src/main/resources/rawfile/runtime-catalog');await mkdir(out,{recursive:true});
   await writeFile(resolve(out,'builtin.json'),JSON.stringify(stable,null,2)+'\n');
@@ -22,7 +27,7 @@ if(option('web')){
   for(const name of ['catalog-validation.mjs','browser-catalog.mjs'])await copyFile(resolve(root,'lib',name),resolve(out,name));
   await writeFile(resolve(out,'trusted-keys.json'),keysBytes);
   for(const channel of ['stable','preview']){
-    const raw=await readFile(resolve(catalogDir,channel+'.json'));verifyEnvelope(raw.toString(),keys,channel);
+    const raw=channel==='stable'?stableRaw:previewRaw;
     await writeFile(resolve(out,channel+'.json'),raw);
   }
 }

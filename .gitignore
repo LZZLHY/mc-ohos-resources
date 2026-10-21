@@ -3,3 +3,7 @@
 *.key
 *.zip
 node_modules/
+
+# 本地中断恢复门禁含外置事务目录；不是公开发行数据，不得提交维护者绝对路径。
+/catalog/.activation-pending.json
+/catalog/v1/*.pending

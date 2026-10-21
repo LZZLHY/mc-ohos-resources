@@ -55,3 +55,19 @@ test('explicit rollback references exact runtime builds and increments recommend
   next.runtimes[1].recommendationRevision++;validateTransition(c,next);
   next.runtimes[1].rollback.fromBuildIds=[next.builds[0].id];assert.throws(()=>validateCatalog(next));
 });
+
+test('channel admission can raise loader protocol without changing stable requirements',()=>{
+  const next=structuredClone(source),oldPreview=projectCatalog(source,'preview');next.catalogRevision++;
+  next.runtimes[1].recommendations.preview.loaderProtocol=2;
+  assert.equal(projectCatalog(next,'stable').runtimes[1].loaderProtocol,1);
+  assert.throws(()=>validateTransition(oldPreview,projectCatalog(next,'preview')),/admission/);
+  next.runtimes[1].recommendations.preview.recommendationRevision++;
+  validateTransition(oldPreview,projectCatalog(next,'preview'));
+  next.runtimes[1].recommendations.preview.arch='x86_64';
+  assert.throws(()=>projectCatalog(next,'preview'),/channel recommendation/);
+});
+
+test('a new buildId cannot reuse another immutable archive filename',()=>{
+  const c=fresh();c.builds[1].archive.fileName=c.builds[0].archive.fileName;
+  assert.throws(()=>validateCatalog(c),/archive filename/);
+});

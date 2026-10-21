@@ -72,6 +72,13 @@ node tools/export-clients.mjs --catalog-dir catalog/v1 --app <MyApplication> --w
 及许可证属于该次真实冻结输入。只放宽派生 kind、补一份无来源的许可、把补充材料
 冒称冻结输入或遗漏依赖供应者均不能通过。
 
+新默认字体/缓存适配带 `sourceAdaptation` 时，原 Fontconfig Git TAR 继续保留上游字节。
+主工程和发布端分别从该 TAR 读取两个原源文件，按冻结 series/patch 精确重放每个 hunk
+的路径、位置、上下文与计数，再核补后 SHA 及生成 generic 头。实际 provider 的编译标记
+同时绑定宏头和默认缓存逻辑；主工程再用真实 ELF 字节检查标记与硬导入。缺任一新字段
+不能退回旧路径通过，原本没有默认适配的历史 provider 仍沿用原来源链。槽外缓存不进入
+运行包或源码文件清单；这组静态来源验证不代替真实设备的默认配置、持久缓存或热开销资格。
+
 旧 `compatible-cxx-provider-repack` 继续兼容。新派生保存执行时的再封包配方原件；
 历史派生缺该副本时，可用主工程导出器的 `--repack-recipe` 显式指定原配方，必须
 精确命中旧收据 SHA。当前脚本演进不要求重写旧 ZIP、旧收据或旧资产身份。

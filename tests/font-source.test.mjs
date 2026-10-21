@@ -7,7 +7,7 @@ import {verifyFontSourceChain} from '../tools/font-source.mjs';
 const raw=x=>Buffer.from(JSON.stringify(x,null,2)+'\n');
 
 /** 真实 ustar/PAX 结构，正文只是测试许可；它不代表上游源码或实际编译产物。 */
-function archive(commit,license,{duplicate=false,badChecksum=false}={}){
+function archive(commit,license,{duplicate=false,badChecksum=false,members={}}={}){
   function entry(name,type,data){
     const h=Buffer.alloc(512);h.write(name);h.write('0000644\0',100);h.write('0000000\0',108);h.write('0000000\0',116);
     h.write(data.length.toString(8).padStart(11,'0')+'\0',124);h.write('00000000000\0',136);h.fill(32,148,156);
@@ -19,6 +19,7 @@ function archive(commit,license,{duplicate=false,badChecksum=false}={}){
   while(count!==String(count).length+1+body.length)count=String(count).length+1+body.length;
   const entries=[entry('pax_global_header',103,Buffer.from(count+' '+body)),entry('COPYING',48,license)];
   if(duplicate)entries.push(entry('COPYING',48,license));
+  for(const [name,data] of Object.entries(members))entries.push(entry(name,48,data));
   const result=Buffer.concat([...entries,Buffer.alloc(1024)]);if(badChecksum)result[0]^=1;return result;
 }
 
@@ -136,4 +137,58 @@ for(const what of ['completion','version-matched license'])test('modern font sou
 test('modern font completion cannot be an unfrozen supplement',()=>{
   const f=fixture('17');delete f.index.frozenFiles['prebuilt/fontconfig/freetype-completion.json'];
   f.refresh();assert.throws(()=>verifyFontSourceChain(f.files,f.index,f.receipt),/not a recorded build input/);
+});
+
+/** 这些是新适配关系的合成输入，未宣称执行了真实字体库。 */
+function enableDefaults(f){
+  const before={'src/fccfg.c':Buffer.from('original\nkeep\n'),'src/fcinit.c':Buffer.from('original\nkeep\n')};
+  const after=Object.fromEntries(Object.keys(before).map(name=>[name,Buffer.from('changed\nkeep\n')]));
+  const patch=Buffer.from(Object.keys(before).map(name=>'diff --git a/'+name+' b/'+name+'\n--- a/'+name+'\n+++ b/'+name+
+    '\n@@ -1,2 +1,2 @@\n-original\n+changed\n keep\n').join(''));
+  const metadata={commit:f.proof.sources.fontconfig.commit,patchSha256:sha256(patch),
+    before:Object.fromEntries(Object.entries(before).map(([name,data])=>[name,sha256(data)])),
+    after:Object.fromEntries(Object.entries(after).map(([name,data])=>[name,sha256(data)]))};
+  const header=Buffer.from('#define AMCL_FONTCONFIG_GENERIC_RULES "<alias/>"\n');
+  const adaptation={...metadata,genericHeader:'prebuilt/fontconfig/ohos-generic-fonts.h',genericHeaderSha256:sha256(header),compiledHeader:'src/amcl-generic-fonts.h'};
+  const freeze=(name,data)=>{
+    f.files.set('font-provider/frozen/'+name,data);f.proof.recipes[name]=sha256(data);f.outer.inputs.files[name]=sha256(data);
+  };
+  freeze('prebuilt/fontconfig/ohos-defaults.json',raw(metadata));
+  freeze('prebuilt/fontconfig/ohos-generic-fonts.h',header);
+  freeze('prebuilt/fontconfig/patches/0001-ohos-default-fonts-and-context-cache.patch',patch);
+  freeze('prebuilt/fontconfig/patches/series',Buffer.from('0001-ohos-default-fonts-and-context-cache.patch\n'));
+  const item=f.proof.sources.fontconfig,data=archive(item.commit,Buffer.from('fontconfig fixture permission\n'),{members:before});
+  item.archiveSha256=sha256(data);item.adaptation=structuredClone(adaptation);
+  f.files.set('font-provider/sources/'+item.archive,data);
+  f.files.set('font-provider/source-identities.json',raw(f.proof.sources));
+  f.source.sourceAdaptation=adaptation;
+  const markers={genericXml:'<alias/>',contextApi:'OH_AbilityRuntime_ApplicationContextGetCacheDir',contextLibrary:'libability_runtime.so',
+    outsideRuntimeCache:'.amcl-fontconfig-cache',classicLayout:'/jre/lib/aarch64/libfontconfig.so',modernLayout:'/lib/libfontconfig.so'};
+  f.source.compiledOhosDefaults={hardContextApiImport:false,markers:Object.fromEntries(Object.entries(markers).map(([name,value])=>[
+    name,{offset:0,sha256:sha256(value),sizeBytes:Buffer.byteLength(value)}]))};
+  for(const name of ['classic','modern']){
+    f.proof.variants[name].sizeBytes=4096;f.source.variants[name].sizeBytes=4096;f.bundle.additions[name].bytes=4096;
+  }
+  f.audit.additions['jre/lib/aarch64/libfontconfig.so'].bytes=4096;
+  f.refresh();return {metadata,adaptation,freeze};
+}
+
+test('font defaults replay both files from the original bound TAR',()=>{
+  const f=fixture();enableDefaults(f);verifyFontSourceChain(f.files,f.index,f.receipt);
+});
+
+for(const [name,change] of [
+  ['missing source adaptation',(f)=>delete f.source.sourceAdaptation],
+  ['unfrozen generic header',(f)=>{delete f.proof.recipes['prebuilt/fontconfig/ohos-generic-fonts.h'];delete f.outer.inputs.files['prebuilt/fontconfig/ohos-generic-fonts.h'];}],
+  ['wrong marker',(f)=>f.source.compiledOhosDefaults.markers.genericXml.sha256=sha256('wrong')],
+  ['hard context import',(f)=>f.source.compiledOhosDefaults.hardContextApiImport=true],
+  ['extra series',(f,{freeze})=>freeze('prebuilt/fontconfig/patches/series',Buffer.from('0001-ohos-default-fonts-and-context-cache.patch\nextra.patch\n'))],
+  ['invented after source',(f,{metadata,adaptation,freeze})=>{
+    metadata.after['src/fccfg.c']=sha256('invented result');adaptation.after=metadata.after;
+    f.proof.sources.fontconfig.adaptation=structuredClone(adaptation);
+    f.files.set('font-provider/source-identities.json',raw(f.proof.sources));freeze('prebuilt/fontconfig/ohos-defaults.json',raw(metadata));
+  }],
+])test('font defaults rejects '+name+' after outer hashes are refreshed',()=>{
+  const f=fixture(),defaults=enableDefaults(f);change(f,defaults);f.refresh();
+  assert.throws(()=>verifyFontSourceChain(f.files,f.index,f.receipt));
 });

@@ -6,6 +6,7 @@
 import {isDeepStrictEqual} from 'node:util';
 import {sha256} from './protocol.mjs';
 import {verifyDerivedFreeTypeNotices} from './freetype-notices.mjs';
+import {verifyFontDefaultAdaptation} from './fontconfig-defaults.mjs';
 
 const assert=(ok,message)=>{if(!ok)throw new Error(message);};
 const HASH=/^[a-f0-9]{64}$/, COMMIT=/^[a-f0-9]{40}$/;
@@ -123,6 +124,9 @@ export function verifyFontSourceChain(files,index,receipt){
   for(const [name,item] of [['meson.whl',spec.meson],['gperf-'+spec.gperf.version+'.tar.gz',spec.gperf]]){
     const path='font-provider/sources/'+name;bound(path,item.sha256);sourceNames.push(path);
   }
+  const fc=proof.sources.fontconfig;
+  verifyFontDefaultAdaptation(files,proof,source,name=>gitArchiveLicense(
+    files.get('font-provider/sources/'+fc.archive),fc.commit,name));
   assert(same(namespace.filter(name=>name.startsWith('font-provider/sources/')),sourceNames.sort()),'font source/tool archive set mismatch');
   const permitted=new Set([...frozenNames,...sourceNames,'font-provider/provenance.json','font-provider/input-bundle.json',
     'font-provider/build-manifest.json','font-provider/source-provenance.json','font-provider/source-identities.json',

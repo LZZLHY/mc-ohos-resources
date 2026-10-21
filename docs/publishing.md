@@ -69,6 +69,12 @@ node tools/export-clients.mjs --catalog-dir catalog/v1 --app <MyApplication> --w
 `duplex-requires-permission-and-device-test`；capture 为
 `implemented-requires-permission-and-device-test`，并保留
 `embeddedCallbacks: signed-host-data-abi-v1-required` 的宿主合同。
+来源进一步含 `0028-ohos-javasound-presentation-timeline.patch` 时，必须使用V3只读标记
+`AMCL_DAUDIO_OHOS_API20_DUPLEX_V3`、backend `ohos-daudio-duplex-v3` 与
+`embeddedCallbacks: signed-host-data-abi-v2-required`；缺少0025前置来源仍拒绝。
+V3逐项要求真实 `OH_AudioRenderer_GetAudioTimestampInfo` 强导入及SDK供应者，旧
+`GetTimestamp` 和累计 `GetFramesWritten` 不再是V3必需项。V1/V2继续自己的历史规则。
+这些静态条件不替代实际用户帧、静音尾部、Flush坐标、关闭/重开的目标设备验证。
 这些字段随相同完整 ZIP 身份写入并在激活收据中再次核验；它们不证明当前 HAP 已供应
 合格回调，不证明 CFI、麦克风授权或真实录音已通过。V1 的旧播放包仍保持原字段与静态规则，
 不追改为已有 capture；Native MIDI 和 Ports 也不因 duplex 标记而自动获得支持。

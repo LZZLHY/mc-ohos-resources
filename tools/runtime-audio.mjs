@@ -14,6 +14,8 @@ export const AUDIO_PATCH='0023-ohos-javasound-daudio-playback.patch';
 export const AUDIO_MARKER=Buffer.from('AMCL_DAUDIO_OHOS_API20_PLAYBACK_V1\0');
 export const AUDIO_DUPLEX_PATCH='0025-ohos-javasound-duplex-host-callbacks.patch';
 export const AUDIO_DUPLEX_MARKER=Buffer.from('AMCL_DAUDIO_OHOS_API20_DUPLEX_V2\0');
+export const AUDIO_TIMELINE_PATCH='0028-ohos-javasound-presentation-timeline.patch';
+export const AUDIO_TIMELINE_MARKER=Buffer.from('AMCL_DAUDIO_OHOS_API20_DUPLEX_V3\0');
 export const AUDIO_SDK_PATH='sysroot/usr/lib/aarch64-linux-ohos/libohaudio.so';
 export const AUDIO_AUDIT_SCOPE='static runtime/SDK/source binding only; no device playback or capture qualification';
 export const REQUIRED_AUDIO_SYMBOLS=[
@@ -32,19 +34,26 @@ export const REQUIRED_CAPTURE_SYMBOLS=[
   'OH_AudioCapturer_GetCurrentState','OH_AudioCapturer_GetSamplingRate','OH_AudioCapturer_GetChannelCount',
   'OH_AudioCapturer_GetSampleFormat','OH_AudioCapturer_GetEncodingType','OH_AudioCapturer_GetFrameSizeInCallback'
 ].sort();
+/** V3按真实呈现时钟映射用户区间；累计written和旧timestamp不再是这版的必需入口。 */
+export const REQUIRED_TIMELINE_AUDIO_SYMBOLS=[...REQUIRED_AUDIO_SYMBOLS.filter(name=>
+  !['OH_AudioRenderer_GetTimestamp','OH_AudioRenderer_GetFramesWritten'].includes(name)),
+  'OH_AudioRenderer_GetAudioTimestampInfo'].sort();
 const SYSTEM=new Set(['libc.so','libm.so','libdl.so','libpthread.so','librt.so','libz.so','ld-musl-aarch64.so.1']);
-export const requiresRuntimeAudio=receipt=>[AUDIO_PATCH,AUDIO_DUPLEX_PATCH].some(name=>Object.hasOwn(receipt?.build?.patches??{},name));
+export const requiresRuntimeAudio=receipt=>[AUDIO_PATCH,AUDIO_DUPLEX_PATCH,AUDIO_TIMELINE_PATCH].some(name=>Object.hasOwn(receipt?.build?.patches??{},name));
 
 /** 由真实冻结补丁身份选合同；V2不能缺失宿主ABI义务，也不能降级到V1标记蒙混通过。 */
 function audioContract(receipt){
   const duplex=Object.hasOwn(receipt?.build?.patches??{},AUDIO_DUPLEX_PATCH);
+  const timeline=Object.hasOwn(receipt?.build?.patches??{},AUDIO_TIMELINE_PATCH);
   assert(Object.hasOwn(receipt?.build?.patches??{},AUDIO_PATCH),'audio audit requires recorded0023 predecessor');
-  return{duplex,marker:duplex?AUDIO_DUPLEX_MARKER:AUDIO_MARKER,
-    backend:duplex?'ohos-daudio-duplex-v2':'ohos-daudio-playback-v1',
+  assert(!timeline||duplex,'timeline audio requires recorded0025 predecessor');
+  const playbackSymbols=timeline?REQUIRED_TIMELINE_AUDIO_SYMBOLS:REQUIRED_AUDIO_SYMBOLS;
+  return{duplex,marker:timeline?AUDIO_TIMELINE_MARKER:duplex?AUDIO_DUPLEX_MARKER:AUDIO_MARKER,
+    backend:timeline?'ohos-daudio-duplex-v3':duplex?'ohos-daudio-duplex-v2':'ohos-daudio-playback-v1',
     capture:duplex?'implemented-requires-permission-and-device-test':'not-implemented',
     pcm:duplex?'duplex-requires-permission-and-device-test':'playback-only-requires-device-test',
-    embedded:duplex?{embeddedCallbacks:'signed-host-data-abi-v1-required'}:{},
-    symbols:duplex?[...REQUIRED_AUDIO_SYMBOLS,...REQUIRED_CAPTURE_SYMBOLS].sort():REQUIRED_AUDIO_SYMBOLS};
+    embedded:duplex?{embeddedCallbacks:timeline?'signed-host-data-abi-v2-required':'signed-host-data-abi-v1-required'}:{},
+    symbols:duplex?[...playbackSymbols,...REQUIRED_CAPTURE_SYMBOLS].sort():playbackSymbols};
 }
 
 /** 每个偏移/64位长度转Number前都限制；字符串和表项不能越过所属已验证区域。 */

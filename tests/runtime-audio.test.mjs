@@ -9,7 +9,7 @@ import {sha256} from '../tools/protocol.mjs';
 import {crc32} from '../tools/source-archive.mjs';
 import {preflightLocalAssets} from '../tools/publish.mjs';
 import {validateDeliveryReceipt} from '../tools/delivery.mjs';
-import {AUDIO_PATCH,AUDIO_MARKER,AUDIO_DUPLEX_PATCH,AUDIO_DUPLEX_MARKER,AUDIO_SDK_PATH,REQUIRED_AUDIO_SYMBOLS,REQUIRED_CAPTURE_SYMBOLS,audioElfFacts,
+import {AUDIO_PATCH,AUDIO_MARKER,AUDIO_DUPLEX_PATCH,AUDIO_DUPLEX_MARKER,AUDIO_TIMELINE_PATCH,AUDIO_TIMELINE_MARKER,AUDIO_SDK_PATH,REQUIRED_AUDIO_SYMBOLS,REQUIRED_TIMELINE_AUDIO_SYMBOLS,REQUIRED_CAPTURE_SYMBOLS,audioElfFacts,
   verifyAudioRuntimeFiles,verifyRuntimeAudioFile,readAudioSdkProviders} from '../tools/runtime-audio.mjs';
 
 const raw=value=>Buffer.from(JSON.stringify(value));
@@ -65,22 +65,22 @@ function zip(files,{deflated=false}={}){
   end.writeUInt16LE(files.size,10);end.writeUInt32LE(c.length,12);end.writeUInt32LE(offset,16);return Buffer.concat([...locals,c,end]);
 }
 
-function fixture({major='17',duplex=false,sound={},sdk={},other={},extraFiles=[]}={}){
-  const used=[...REQUIRED_AUDIO_SYMBOLS,...(duplex?REQUIRED_CAPTURE_SYMBOLS:[]),'OH_AudioStreamBuilder_Create'].sort();
+function fixture({major='17',timeline=false,duplex=timeline,sound={},sdk={},other={},extraFiles=[]}={}){
+  const used=[...(timeline?REQUIRED_TIMELINE_AUDIO_SYMBOLS:REQUIRED_AUDIO_SYMBOLS),...(duplex?REQUIRED_CAPTURE_SYMBOLS:[]),'OH_AudioStreamBuilder_Create'].sort();
   const provider=elf({exports:used,soname:'libohaudio.so',...sdk}),sdkHash=sha256(provider);
   const soundPath=(major==='8'?'jre/lib/aarch64/':'lib/')+'libjsound.so';
-  const files=new Map([[soundPath,elf({imports:used,needed:['libc.so','libohaudio.so'],marker:true,markerBytes:duplex?AUDIO_DUPLEX_MARKER:AUDIO_MARKER,...sound})],
+  const files=new Map([[soundPath,elf({imports:used,needed:['libc.so','libohaudio.so'],marker:true,markerBytes:timeline?AUDIO_TIMELINE_MARKER:duplex?AUDIO_DUPLEX_MARKER:AUDIO_MARKER,...sound})],
     ['lib/libother.so',elf(other)],['release',Buffer.from('synthetic fixture')],...extraFiles]);
-  const receipt={buildId:'test-audio-'+major,bytes:0,sha256:'',build:{major,patches:{[AUDIO_PATCH]:sha256('patch'),...(duplex?{[AUDIO_DUPLEX_PATCH]:sha256('duplex-patch')}:{})},
+  const receipt={buildId:'test-audio-'+major,bytes:0,sha256:'',build:{major,patches:{[AUDIO_PATCH]:sha256('patch'),...(duplex?{[AUDIO_DUPLEX_PATCH]:sha256('duplex-patch')}:{}),...(timeline?{[AUDIO_TIMELINE_PATCH]:sha256('timeline-patch')}:{})},
     inputClosure:{nativeSdk:{files:{[AUDIO_SDK_PATH]:sdkHash}}}}};
   const manifest={schema:1,buildId:receipt.buildId,build:receipt.build,files:{},nativeLibraries:{},
     capabilities:{'javaSound.nativePcm':duplex?'duplex-requires-permission-and-device-test':'playback-only-requires-device-test','javaSound.nativePlayback':'implemented-requires-device-test',
       'javaSound.nativeCapture':duplex?'implemented-requires-permission-and-device-test':'not-implemented','javaSound.nativeMidi':'unavailable-safe','javaSound.ports':'unavailable-safe'}};
   for(const [name,bytes] of files){manifest.files[name]={sha256:sha256(bytes),bytes:bytes.length,mode,type:'file'};
     if(name.includes('.so'))manifest.nativeLibraries[name]=audioElfFacts(bytes);}
-  manifest.nativeLibraries[soundPath].javaSoundBackend={backend:duplex?'ohos-daudio-duplex-v2':'ohos-daudio-playback-v1',minimumApi:20,
+  manifest.nativeLibraries[soundPath].javaSoundBackend={backend:timeline?'ohos-daudio-duplex-v3':duplex?'ohos-daudio-duplex-v2':'ohos-daudio-playback-v1',minimumApi:20,
     qualification:'implemented-requires-device-test',capture:duplex?'implemented-requires-permission-and-device-test':'not-implemented',
-    ...(duplex?{embeddedCallbacks:'signed-host-data-abi-v1-required'}:{}),provider:'libohaudio.so',providerSha256:sdkHash,
+    ...(duplex?{embeddedCallbacks:timeline?'signed-host-data-abi-v2-required':'signed-host-data-abi-v1-required'}:{}),provider:'libohaudio.so',providerSha256:sdkHash,
     requiredSymbols:manifest.nativeLibraries[soundPath].imports.filter(n=>n.startsWith('OH_Audio'))};
   const providers=new Map([[sdkHash,provider]]);
   const finish=(options={})=>{
@@ -102,6 +102,26 @@ for(const major of ['8','17','21','25'])test('audio gate accepts exact '+major+'
   assert.equal(result.embeddedCallbacks,'signed-host-data-abi-v1-required');
   const {closure,receipt}=delivery(f);validateDeliveryReceipt(receipt,closure);
 });
+
+for(const major of ['8','17','21','25'])test('audio gate accepts exact '+major+' timeline V3 and ABI2 supplier',()=>{
+  const f=fixture({major,timeline:true}),result=f.verify();
+  assert.equal(result.backend,'ohos-daudio-duplex-v3');assert.equal(result.embeddedCallbacks,'signed-host-data-abi-v2-required');
+  assert(result.requiredSymbols.includes('OH_AudioRenderer_GetAudioTimestampInfo'));
+  assert(!result.requiredSymbols.includes('OH_AudioRenderer_GetFramesWritten'));
+  assert(!result.requiredSymbols.includes('OH_AudioRenderer_GetTimestamp'));
+  const {closure,receipt}=delivery(f);validateDeliveryReceipt(receipt,closure);
+});
+for(const [name,options] of [
+  ['old V2 marker',{sound:{markerBytes:AUDIO_DUPLEX_MARKER}}],
+  ['weak presentation timestamp',{sound:{weak:['OH_AudioRenderer_GetAudioTimestampInfo']}}],
+  ['missing presentation timestamp',{sound:{imports:[...REQUIRED_AUDIO_SYMBOLS,...REQUIRED_CAPTURE_SYMBOLS]}}],
+  ['SDK lacks presentation timestamp',{sdk:{exports:[...REQUIRED_AUDIO_SYMBOLS,...REQUIRED_CAPTURE_SYMBOLS]}}]
+])test('timeline V3 rejects '+name,()=>assert.throws(()=>fixture({timeline:true,...options}).verify()));
+for(const [name,change] of [
+  ['missing0028',f=>delete f.receipt.build.patches[AUDIO_TIMELINE_PATCH]],
+  ['missing0025 predecessor',f=>delete f.receipt.build.patches[AUDIO_DUPLEX_PATCH]],
+  ['old host ABI',f=>f.manifest.nativeLibraries[f.soundPath].javaSoundBackend.embeddedCallbacks='signed-host-data-abi-v1-required']
+])test('timeline V3 rejects '+name,()=>{const f=fixture({timeline:true});change(f);assert.throws(f.verify);});
 
 for(const [name,options] of [
   ['old marker under0025',{sound:{markerBytes:AUDIO_MARKER}}],
@@ -216,5 +236,14 @@ for(const [name,change] of [
   ['unqualified host claimed verified',a=>a.hostCallbacksQualified=true]
 ])test('activation rejects duplex receipt '+name,()=>{
   const {closure,receipt}=delivery(fixture({duplex:true}));change(receipt.assets[0].runtimeAudio);
+  assert.throws(()=>validateDeliveryReceipt(receipt,closure));
+});
+
+for(const [name,change] of [
+  ['old host ABI',a=>a.embeddedCallbacks='signed-host-data-abi-v1-required'],
+  ['old backend claim',a=>a.backend='ohos-daudio-duplex-v2'],
+  ['missing presentation timestamp',a=>a.requiredSymbols=a.requiredSymbols.filter(n=>n!=='OH_AudioRenderer_GetAudioTimestampInfo')]
+])test('activation rejects timeline V3 receipt '+name,()=>{
+  const {closure,receipt}=delivery(fixture({timeline:true}));change(receipt.assets[0].runtimeAudio);
   assert.throws(()=>validateDeliveryReceipt(receipt,closure));
 });

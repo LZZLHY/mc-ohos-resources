@@ -61,6 +61,17 @@ node tools/export-clients.mjs --catalog-dir catalog/v1 --app <MyApplication> --w
 `implemented-requires-device-test` 播放实现，capture 为 `not-implemented`；
 真机播放、关闭恢复、默认 ProcessBuilder 和整套性能仍须各自的实际证据，不能由静态门授予资格。
 
+同时记录 `0025-ohos-javasound-duplex-host-callbacks.patch` 的构建必须使用真实
+`AMCL_DAUDIO_OHOS_API20_DUPLEX_V2` 只读标记，不能退回 V1 通过。除播放入口外，
+门禁逐项要求原 SDK 供应 Capturer 创建/配置/读回调/错误及中断回调、开始/暂停/清空/释放、
+实际格式查询等全部必需强入口。其实际 capability 必须精确声明
+`duplex-requires-permission-and-device-test`；capture 为
+`implemented-requires-permission-and-device-test`，并保留
+`embeddedCallbacks: signed-host-data-abi-v1-required` 的宿主合同。
+这些字段随相同完整 ZIP 身份写入并在激活收据中再次核验；它们不证明当前 HAP 已供应
+合格回调，不证明 CFI、麦克风授权或真实录音已通过。V1 的旧播放包仍保持原字段与静态规则，
+不追改为已有 capture；Native MIDI 和 Ports 也不因 duplex 标记而自动获得支持。
+
 激活先验证两个候选签名、源投影、完整资产收据和前后代次，再保存外置事务的旧/新原件，并逐文件原子替换。`catalog/.activation-pending.json` 存在时禁止签名、常规检查及消费者导出。若第一文件替换后中断，用完全相同的 `activate` 参数重跑；只有当前文件分别等于已记旧件或新件、输入闭包和候选没有变化，才能补齐同批并清除标记。不要手工删标记或将半批推送。日志准备阶段失败且尚无 pending 标记时旧目录未被更改，保留失败目录并使用新的事务目录。文件同步和恢复测试不是硬件断电持久化或两个远程 URL 同时切换的保证，最终仍须 Git 同批提交与远端读回。
 
 自有源验收用 `node tools/publish.mjs verify-web --receipt <new-web-receipt.json>` 完整读回所有 web 包；同时检查 HEAD 长度、Range 206、ETag/304 和签名 JSON 一致。上传成功不等于读回验收。

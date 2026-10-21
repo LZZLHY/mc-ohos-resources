@@ -12,6 +12,8 @@ const assert=(ok,message)=>{if(!ok)throw new Error(message);};
 const HASH=/^[a-f0-9]{64}$/;
 export const AUDIO_PATCH='0023-ohos-javasound-daudio-playback.patch';
 export const AUDIO_MARKER=Buffer.from('AMCL_DAUDIO_OHOS_API20_PLAYBACK_V1\0');
+export const AUDIO_DUPLEX_PATCH='0025-ohos-javasound-duplex-host-callbacks.patch';
+export const AUDIO_DUPLEX_MARKER=Buffer.from('AMCL_DAUDIO_OHOS_API20_DUPLEX_V2\0');
 export const AUDIO_SDK_PATH='sysroot/usr/lib/aarch64-linux-ohos/libohaudio.so';
 export const AUDIO_AUDIT_SCOPE='static runtime/SDK/source binding only; no device playback or capture qualification';
 export const REQUIRED_AUDIO_SYMBOLS=[
@@ -22,8 +24,28 @@ export const REQUIRED_AUDIO_SYMBOLS=[
   'OH_AudioRenderer_GetSamplingRate','OH_AudioRenderer_GetChannelCount','OH_AudioRenderer_GetSampleFormat',
   'OH_AudioRenderer_GetEncodingType','OH_AudioManager_GetAudioRoutingManager','OH_AudioRoutingManager_GetPreferredOutputDevice'
 ].sort();
+export const REQUIRED_CAPTURE_SYMBOLS=[
+  'OH_AudioRoutingManager_GetPreferredInputDevice','OH_AudioStreamBuilder_SetCapturerInfo',
+  'OH_AudioStreamBuilder_GenerateCapturer','OH_AudioStreamBuilder_SetCapturerReadDataCallback',
+  'OH_AudioStreamBuilder_SetCapturerErrorCallback','OH_AudioStreamBuilder_SetCapturerInterruptCallback',
+  'OH_AudioCapturer_Start','OH_AudioCapturer_Pause','OH_AudioCapturer_Flush','OH_AudioCapturer_Release',
+  'OH_AudioCapturer_GetCurrentState','OH_AudioCapturer_GetSamplingRate','OH_AudioCapturer_GetChannelCount',
+  'OH_AudioCapturer_GetSampleFormat','OH_AudioCapturer_GetEncodingType','OH_AudioCapturer_GetFrameSizeInCallback'
+].sort();
 const SYSTEM=new Set(['libc.so','libm.so','libdl.so','libpthread.so','librt.so','libz.so','ld-musl-aarch64.so.1']);
-export const requiresRuntimeAudio=receipt=>Object.hasOwn(receipt?.build?.patches??{},AUDIO_PATCH);
+export const requiresRuntimeAudio=receipt=>[AUDIO_PATCH,AUDIO_DUPLEX_PATCH].some(name=>Object.hasOwn(receipt?.build?.patches??{},name));
+
+/** 由真实冻结补丁身份选合同；V2不能缺失宿主ABI义务，也不能降级到V1标记蒙混通过。 */
+function audioContract(receipt){
+  const duplex=Object.hasOwn(receipt?.build?.patches??{},AUDIO_DUPLEX_PATCH);
+  assert(Object.hasOwn(receipt?.build?.patches??{},AUDIO_PATCH),'audio audit requires recorded0023 predecessor');
+  return{duplex,marker:duplex?AUDIO_DUPLEX_MARKER:AUDIO_MARKER,
+    backend:duplex?'ohos-daudio-duplex-v2':'ohos-daudio-playback-v1',
+    capture:duplex?'implemented-requires-permission-and-device-test':'not-implemented',
+    pcm:duplex?'duplex-requires-permission-and-device-test':'playback-only-requires-device-test',
+    embedded:duplex?{embeddedCallbacks:'signed-host-data-abi-v1-required'}:{},
+    symbols:duplex?[...REQUIRED_AUDIO_SYMBOLS,...REQUIRED_CAPTURE_SYMBOLS].sort():REQUIRED_AUDIO_SYMBOLS};
+}
 
 /** 每个偏移/64位长度转Number前都限制；字符串和表项不能越过所属已验证区域。 */
 export function audioElfFacts(bytes){
@@ -98,6 +120,7 @@ export async function readAudioSdkProviders(path){
 /** files只含经过CRC/清单核对的真实DSO与manifest；entry表覆盖运行ZIP全量名字/尺寸/模式。 */
 export function verifyAudioRuntimeFiles(files,entries,receipt,providers){
   assert(requiresRuntimeAudio(receipt),'audio audit requires the recorded0023 source patch');
+  const contract=audioContract(receipt);
   const raw=files.get('amcl-runtime.json');assert(raw,'runtime manifest absent');const manifest=JSON.parse(raw);
   assert(manifest.schema===1&&same(manifest.build,receipt.build)&&(!receipt.buildId||manifest.buildId===receipt.buildId)&&
     same(manifest.derivation??null,receipt.derivation??null),'audio runtime inner/outer identity mismatch');
@@ -129,42 +152,45 @@ export function verifyAudioRuntimeFiles(files,entries,receipt,providers){
       'audio capability/import outside libjsound');
   }
   assert(sound,'new audio build has no libjsound');
-  const marker={type:1,flags:2,bytes:AUDIO_MARKER.length,valueHex:AUDIO_MARKER.toString('hex'),mappedReadonly:true};
+  const marker={type:1,flags:2,bytes:contract.marker.length,valueHex:contract.marker.toString('hex'),mappedReadonly:true};
   assert(same(sound.ohosDaudioMarkers,[marker])&&sound.needed.includes('libohaudio.so'),'missing real readonly audio marker/dependency');
-  assert(REQUIRED_AUDIO_SYMBOLS.every(n=>sound.strongImports.includes(n)),'missing required strong audio entry point');
+  assert(contract.symbols.every(n=>sound.strongImports.includes(n)),'missing required strong audio entry point');
   const used=sound.imports.filter(n=>n.startsWith('OH_Audio')).sort(),sdkHash=receipt.build.inputClosure?.nativeSdk?.files?.[AUDIO_SDK_PATH];
   assert(HASH.test(sdkHash),'audio SDK provider missing from complete original build inputs');
   const sdk=providers.get(sdkHash);assert(sdk&&sha256(sdk)===sdkHash,'explicit matching SDK provider bytes required for audio audit');
   const sdkFacts=audioElfFacts(sdk);assert(sdkFacts.soname==='libohaudio.so','audio SDK provider SONAME mismatch');
   assert(used.every(n=>sdkFacts.resolvableExports.includes(n)),'SDK does not supply every audio import');
-  const backend={backend:'ohos-daudio-playback-v1',minimumApi:20,qualification:'implemented-requires-device-test',capture:'not-implemented',
+  const backend={backend:contract.backend,minimumApi:20,qualification:'implemented-requires-device-test',capture:contract.capture,...contract.embedded,
     provider:'libohaudio.so',providerSha256:sdkHash,requiredSymbols:used};
   assert(same(manifest.nativeLibraries[soundPath].javaSoundBackend,backend),'audio capability supplier proof differs from actual ELF/SDK');
   const caps=manifest.capabilities??{};
-  assert(caps['javaSound.nativePcm']==='playback-only-requires-device-test'&&caps['javaSound.nativePlayback']===backend.qualification&&
-    caps['javaSound.nativeCapture']==='not-implemented'&&caps['javaSound.nativeMidi']==='unavailable-safe'&&caps['javaSound.ports']==='unavailable-safe',
+  assert(caps['javaSound.nativePcm']===contract.pcm&&caps['javaSound.nativePlayback']===backend.qualification&&
+    caps['javaSound.nativeCapture']===contract.capture&&caps['javaSound.nativeMidi']==='unavailable-safe'&&caps['javaSound.ports']==='unavailable-safe',
     'audio capabilities overclaim or omit exact playback/capture status');
   return{schemaVersion:1,buildId:receipt.buildId,archiveSha256:receipt.sha256,archiveSizeBytes:receipt.bytes,
     soundPath,soundSha256:sha256(files.get(soundPath)),manifestSha256:sha256(raw),backend:backend.backend,
-    minimumApi:20,qualification:backend.qualification,capture:backend.capture,sdkProviderSha256:sdkHash,
+    minimumApi:20,qualification:backend.qualification,capture:backend.capture,...contract.embedded,sdkProviderSha256:sdkHash,
     requiredSymbols:used,nativeLibraryCount:nativeNames.length,fileCount:entries.size,scope:AUDIO_AUDIT_SCOPE};
 }
 
 /** 激活只消费已完整远端读回的同一 ZIP；新音频收据不能省略或跨包挪用静态验收。 */
 export function validateRuntimeAudioAudit(audit,target,receipt){
+  const contract=audioContract(receipt);
   const keys=['schemaVersion','buildId','archiveSha256','archiveSizeBytes','soundPath','soundSha256','manifestSha256',
-    'backend','minimumApi','qualification','capture','sdkProviderSha256','requiredSymbols','nativeLibraryCount','fileCount','scope'];
+    'backend','minimumApi','qualification','capture','sdkProviderSha256','requiredSymbols','nativeLibraryCount','fileCount','scope',
+    ...(contract.duplex?['embeddedCallbacks']:[])];
   const expectedPath=(String(receipt.build.major)==='8'?'jre/lib/aarch64/':'lib/')+'libjsound.so';
   assert(requiresRuntimeAudio(receipt)&&audit&&same(Object.keys(audit).sort(),keys.sort())&&audit.schemaVersion===1&&
     audit.buildId===target.buildId&&audit.archiveSha256===target.sha256&&audit.archiveSizeBytes===target.sizeBytes&&
     audit.soundPath===expectedPath&&HASH.test(audit.soundSha256)&&HASH.test(audit.manifestSha256)&&
     audit.sdkProviderSha256===receipt.build.inputClosure?.nativeSdk?.files?.[AUDIO_SDK_PATH]&&HASH.test(audit.sdkProviderSha256)&&
-    audit.backend==='ohos-daudio-playback-v1'&&audit.minimumApi===20&&audit.qualification==='implemented-requires-device-test'&&
-    audit.capture==='not-implemented'&&audit.scope===AUDIO_AUDIT_SCOPE,'missing/invalid exact runtime audio audit');
+    audit.backend===contract.backend&&audit.minimumApi===20&&audit.qualification==='implemented-requires-device-test'&&
+    audit.capture===contract.capture&&(!contract.duplex||audit.embeddedCallbacks===contract.embedded.embeddedCallbacks)&&
+    audit.scope===AUDIO_AUDIT_SCOPE,'missing/invalid exact runtime audio audit');
   assert(Array.isArray(audit.requiredSymbols)&&audit.requiredSymbols.length<=512&&
     audit.requiredSymbols.every(n=>typeof n==='string'&&/^OH_Audio[A-Za-z0-9_]{1,120}$/.test(n))&&
     same(audit.requiredSymbols,[...new Set(audit.requiredSymbols)].sort())&&
-    REQUIRED_AUDIO_SYMBOLS.every(n=>audit.requiredSymbols.includes(n))&&
+    contract.symbols.every(n=>audit.requiredSymbols.includes(n))&&
     Number.isSafeInteger(audit.nativeLibraryCount)&&audit.nativeLibraryCount>0&&audit.nativeLibraryCount<=50000&&
     Number.isSafeInteger(audit.fileCount)&&audit.fileCount>audit.nativeLibraryCount&&audit.fileCount<=50000,
     'incomplete runtime audio audit supplier/member proof');

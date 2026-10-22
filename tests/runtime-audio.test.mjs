@@ -11,6 +11,7 @@ import {preflightLocalAssets} from '../tools/publish.mjs';
 import {validateDeliveryReceipt} from '../tools/delivery.mjs';
 import {AUDIO_PATCH,AUDIO_MARKER,AUDIO_DUPLEX_PATCH,AUDIO_DUPLEX_MARKER,AUDIO_TIMELINE_PATCH,AUDIO_TIMELINE_MARKER,AUDIO_SDK_PATH,REQUIRED_AUDIO_SYMBOLS,REQUIRED_TIMELINE_AUDIO_SYMBOLS,REQUIRED_CAPTURE_SYMBOLS,audioElfFacts,
   verifyAudioRuntimeFiles,verifyRuntimeAudioFile,readAudioSdkProviders,verifySoundSymbolClosure} from '../tools/runtime-audio.mjs';
+import {NATIVE_TEMP_PATCH,PERFDATA_UID_PATCH,NATIVE_TEMP_MARKER} from '../tools/runtime-native-temp.mjs';
 
 const raw=value=>Buffer.from(JSON.stringify(value));
 const mode=0o100644;
@@ -65,7 +66,7 @@ function zip(files,{deflated=false}={}){
   end.writeUInt16LE(files.size,10);end.writeUInt32LE(c.length,12);end.writeUInt32LE(offset,16);return Buffer.concat([...locals,c,end]);
 }
 
-function fixture({major='17',timeline=false,duplex=timeline,sound={},sdk={},other={},extraFiles=[]}={}){
+function fixture({major='17',timeline=false,duplex=timeline,sound={},sdk={},other={},extraFiles=[],nativeTemp=false}={}){
   const used=[...(timeline?REQUIRED_TIMELINE_AUDIO_SYMBOLS:REQUIRED_AUDIO_SYMBOLS),...(duplex?REQUIRED_CAPTURE_SYMBOLS:[]),'OH_AudioStreamBuilder_Create'].sort();
   const provider=elf({exports:used,soname:'libohaudio.so',...sdk}),sdkHash=sha256(provider);
   const libc=elf({soname:'libc.so'}),libcHash=sha256(libc);
@@ -74,6 +75,15 @@ function fixture({major='17',timeline=false,duplex=timeline,sound={},sdk={},othe
     ['lib/libother.so',elf(other)],['release',Buffer.from('synthetic fixture')],...extraFiles]);
   const receipt={buildId:'test-audio-'+major,bytes:0,sha256:'',build:{major,patches:{[AUDIO_PATCH]:sha256('patch'),...(duplex?{[AUDIO_DUPLEX_PATCH]:sha256('duplex-patch')}:{}),...(timeline?{[AUDIO_TIMELINE_PATCH]:sha256('timeline-patch')}:{})},
     inputClosure:{nativeSdk:{files:{[AUDIO_SDK_PATH]:sdkHash,'sysroot/usr/lib/aarch64-linux-ohos/libc.so':libcHash}}}}};
+  if(nativeTemp){
+    const jvm=(major==='8'?'jre/lib/aarch64/':'lib/')+'server/libjvm.so';
+    files.set(jvm,elf({marker:true,markerName:'.amcl.nativetemp',markerBytes:NATIVE_TEMP_MARKER,sectionFlags:0x200002}));
+    receipt.build.inputClosure.files={};
+    for(const patch of [NATIVE_TEMP_PATCH,PERFDATA_UID_PATCH]){
+      const hash=sha256(patch);receipt.build.patches[patch]=hash;
+      receipt.build.inputClosure.files['prebuilt/jdk/'+major+'/patches/'+patch]=hash;
+    }
+  }
   const manifest={schema:1,buildId:receipt.buildId,build:receipt.build,files:{},nativeLibraries:{},
     capabilities:{'javaSound.nativePcm':duplex?'duplex-requires-permission-and-device-test':'playback-only-requires-device-test','javaSound.nativePlayback':'implemented-requires-device-test',
       'javaSound.nativeCapture':duplex?'implemented-requires-permission-and-device-test':'not-implemented','javaSound.nativeMidi':'unavailable-safe','javaSound.ports':'unavailable-safe'}};
@@ -96,6 +106,30 @@ for(const major of ['8','17','21','25'])test('audio gate accepts exact '+major+'
   const f=fixture({major}),result=f.verify();assert.equal(result.soundPath,f.soundPath);assert.equal(result.requiredSymbols.length,18);
   assert.equal(result.capture,'not-implemented');assert.equal(result.sdkProviderSha256,f.sdkHash);
 });
+
+for(const major of ['8','17','21','25'])test('combined ZIP audit binds '+major+' native temp to same manifest/source',()=>{
+  const f=fixture({major,nativeTemp:true}),{closure,receipt}=delivery(f);
+  assert.equal(receipt.assets[0].runtimeAudio.nativeTemp.qualification,'static-source-and-readonly-marker-only');
+  validateDeliveryReceipt(receipt,closure);
+  delete receipt.assets[0].runtimeAudio.nativeTemp;
+  assert.throws(()=>validateDeliveryReceipt(receipt,closure),/audio audit|native temp/);
+});
+
+test('actual local/ZIP readback requires the native temp static record',async()=>{
+  const f=fixture({nativeTemp:true}),{bytes,target}=f.finish(),root=await temp(),file=resolve(root,target.fileName);
+  await writeFile(file,bytes);
+  const actual=await verifyRuntimeAudioFile(file,target,f.receipt,f.providers);
+  assert.equal(actual.nativeTemp.jvmSha256,sha256(f.files.get('lib/server/libjvm.so')));
+});
+
+for(const [name,change] of [
+  ['source says new but no marker',f=>delete f.manifest.nativeLibraries['lib/server/libjvm.so'].ohosNativeTempMarkers],
+  ['only0030',f=>delete f.receipt.build.patches[PERFDATA_UID_PATCH]],
+  ['frozen source mismatch',f=>f.receipt.build.inputClosure.files={}],
+  ['copied marker to other DSO',f=>{const bytes=f.files.get('lib/server/libjvm.so');f.files.set('lib/libother.so',bytes);
+    f.manifest.files['lib/libother.so']={sha256:sha256(bytes),bytes:bytes.length,mode,type:'file'};
+    f.manifest.nativeLibraries['lib/libother.so']=audioElfFacts(bytes);}]
+])test('combined native temp rejects '+name,()=>{const f=fixture({nativeTemp:true});change(f);assert.throws(()=>f.verify());});
 
 for(const major of ['8','17','21','25'])test('audio gate accepts exact '+major+' duplex supplier with host ABI obligation',()=>{
   const f=fixture({major,duplex:true}),result=f.verify();assert.equal(result.backend,'ohos-daudio-duplex-v2');

@@ -58,8 +58,13 @@ test('explicit rollback references exact runtime builds and increments recommend
 
 test('channel admission can raise loader protocol without changing stable requirements',()=>{
   const next=structuredClone(source),oldPreview=projectCatalog(source,'preview');next.catalogRevision++;
-  next.runtimes[1].recommendations.preview.loaderProtocol=2;
-  assert.equal(projectCatalog(next,'stable').runtimes[1].loaderProtocol,1);
+  // 以当前快照构造真实变化；公开 preview 升到2后，不能再用2→2冒充准入变化负例。
+  const stableProtocol=projectCatalog(source,'stable').runtimes[1].loaderProtocol;
+  const previousProtocol=oldPreview.runtimes[1].loaderProtocol;
+  next.runtimes[1].recommendations.preview.loaderProtocol=previousProtocol;
+  assert.doesNotThrow(()=>validateTransition(oldPreview,projectCatalog(next,'preview')));
+  next.runtimes[1].recommendations.preview.loaderProtocol=previousProtocol+1;
+  assert.equal(projectCatalog(next,'stable').runtimes[1].loaderProtocol,stableProtocol);
   assert.throws(()=>validateTransition(oldPreview,projectCatalog(next,'preview')),/admission/);
   next.runtimes[1].recommendations.preview.recommendationRevision++;
   validateTransition(oldPreview,projectCatalog(next,'preview'));

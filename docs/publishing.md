@@ -79,5 +79,13 @@ SHA/大小）。收据用于同批对账，不能替代 JWS 固定公钥验签�
 `export-clients.mjs --web` 也复制独立 Node 验证所需的 tools/protocol.mjs 与两个纯验证
 模块，并记录逐文件摘要，官网 clean clone 不依赖维护者相邻仓。
 
+验证器来源记录为 `sourceRepository`、真实 `sourceCommit`、`hashBasis:git-blob-lf` 和三份
+Git blob SHA。导出先绑定同一个 HEAD 与 index，再逐字证明工作副本仅有允许的 CRLF→LF
+差异；正文/暂存区漂移、assume-unchanged 隐藏差异或读取期间 HEAD 变化均拒绝。输出
+直接使用固定提交的规范 LF 字节，不能将未提交的新验证逻辑归因于旧 HEAD。
+`normalizationEvidence` 保存实际换行归一化文件及原 Git status；不将 Windows 的 stat
+缓存或纯换行差异伪称为全工作树洁净。该记录仅说明冻结的验证模块，不能代替官网公钥
+或签名目录的独立信任身份。
+
 本轮仅实现并验证候选工具，没有更换线上 revision、推荐、JDK ZIP 或生产私钥。旧稳定
 JDK8 的合格替代、旧 Native/协议2候选整合与组合设备资格仍需分别闭合后再授权发行。

@@ -8,6 +8,7 @@ import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {projectCatalogV2,projectLegacyCatalog,assertPublishedHostCoverage} from '../lib/catalog-v2.mjs';
 import {signCatalog,verifyEnvelope,validateTransition,sha256} from './protocol.mjs';
+import {readDeliveryClosure,validateDeliveryReceipt} from './delivery.mjs';
 export {projectCatalogV2,projectLegacyCatalog,assertPublishedHostCoverage};
 const args=process.argv.slice(2),option=name=>{const i=args.indexOf('--'+name);return i<0?undefined:args[i+1];};
 const required=name=>{const value=option(name);if(!value)throw Error('--'+name+' required');return value;};
@@ -32,18 +33,29 @@ async function main(){
       const text=await response.text();if(Buffer.byteLength(text)>65536)throw Error('published host receipt too large');hosts.push(JSON.parse(text));
     }
     const assets=JSON.parse(await readFile(required('asset-receipt'),'utf8'));
-    if(assets.sourceSha256!==sha256(await readFile(required('source'))))throw Error('source changed since immutable asset readback');
-    for(const b of source.builds.filter(b=>b.provenance.kind==='source-build')){
-      const github=b.downloads.find(d=>d.sourceId==='github');
-      if(!github||!assets.assets.some(a=>a.url===github.url&&a.sha256===b.archive.sha256&&a.sizeBytes===b.archive.sizeBytes))throw Error('missing immutable asset readback: '+b.id);
-    }
+    // 与R12上传/激活共用完整闭包，包含源码ZIP、原始收据、SDK和实际音频审计。
+    // 只有runtime的SHA列表不能证明新格式已经具备同等发行资格。
+    const root=option('delivery-root')?resolve(option('delivery-root')):resolve(dirname(fileURLToPath(import.meta.url)),'..');
+    validateDeliveryReceipt(assets,await readDeliveryClosure(root,required('source')));
   }
   for(const [version,,catalog]of candidates)if(version===2)assertPublishedHostCoverage(catalog,hosts);
   const key=await readFile(required('key'),'utf8');const keys=JSON.parse(await readFile(required('keys'),'utf8'));
   const out=resolve(required('out'));try{await access(out);throw Error('candidate output already exists');}catch(e){if(e.code!=='ENOENT')throw e;}
   const signed=[];
+  let previousHasV2=false;
+  if(option('previous')){
+    const present=[];
+    for(const channel of ['stable','preview']){
+      try{await access(resolve(option('previous'),'v2',channel+'.json'));present.push(true);}
+      catch(error){if(error.code!=='ENOENT')throw error;present.push(false);}
+    }
+    if(present[0]!==present[1])throw Error('previous v2 namespace is incomplete');
+    previousHasV2=present[0];
+  }
   for(const [version,channel,catalog]of candidates){
-    if(option('previous')){
+    // 首次v2从真实v1历史迁移：v1两通道仍执行完整防回退，首次v2尚无前代文件。
+    // 已存在的v2必须成对且各自验证，不能用删除一份文件重置某个通道的历史。
+    if(option('previous')&&(version===1||previousHasV2)){
       const previous=resolve(option('previous'),'v'+version,channel+'.json');
       validateTransition(verifyEnvelope(await readFile(previous,'utf8'),keys,channel,Date.now(),true),catalog);
     }

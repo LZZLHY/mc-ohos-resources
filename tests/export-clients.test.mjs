@@ -25,12 +25,19 @@ test('export freezes committed Git blobs, canonical LF and exact source identity
   const check=(name,body)=>{body();cases.push(name);};
   try{
     fs.mkdirSync(repo);
+    // 导出器的待恢复检查现与R12发行事务共用模块；夹具携带真实依赖正文，不用空桩
+    // 绕过激活保护。只复制本仓tools/lib文本，正式对象库与外部凭据不进入夹具。
+    for(const directory of ['tools','lib'])for(const name of fs.readdirSync(path.join(producer,directory))){
+      if(!name.endsWith('.mjs'))continue;
+      fs.mkdirSync(path.join(repo,directory),{recursive:true});
+      fs.copyFileSync(path.join(producer,directory,name),path.join(repo,directory,name));
+    }
     for(const name of [...names,'tools/export-clients.mjs','lib/browser-catalog.mjs','catalog/trusted-keys.json','catalog/v1/stable.json','catalog/v1/preview.json']){
       const target=path.join(repo,name);fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(path.join(producer,name),target);
     }
     fs.writeFileSync(path.join(repo,'.gitattributes'),'*.mjs text eol=lf\n*.json -text\n');
     git('-c','init.defaultBranch=main','init');git('config','user.name','AMCL isolated export test');git('config','user.email','export-test@invalid');git('config','core.autocrlf','false');
-    git('add','--','.gitattributes',...names,'tools/export-clients.mjs','lib/browser-catalog.mjs','catalog');git('commit','-m','reproducible export test input');
+    git('add','--','.gitattributes','tools','lib','catalog');git('commit','-m','reproducible export test input');
     const initial=git('rev-parse','HEAD').toString('utf8').trim();
     const run=name=>{
       const web=path.join(area,name+'-web'),app=path.join(area,name+'-app');

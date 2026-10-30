@@ -56,11 +56,17 @@ async function freezeContract(){
 // 验证器本身也必须先通过冻结检查，不能先执行一份未提交模块再声称拒绝其漂移。
 const frozenContract=await freezeContract();
 const {verifyEnvelope}=await import('./protocol.mjs');
+// activation间接依赖同一验证器；同样必须在Git字节冻结之后加载，防止静态import提前执行脏模块。
+const {assertNoPendingActivation}=await import('./activation.mjs');
 const catalogDir=resolve(option('catalog-dir')||resolve(root,'catalog/v1'));
+await assertNoPendingActivation(root);
 const keysBytes=await readFile(resolve(root,'catalog/trusted-keys.json'));
 const keys=JSON.parse(keysBytes);
 const stableRaw=await readFile(resolve(catalogDir,'stable.json'));
 const stable=verifyEnvelope(stableRaw.toString(),keys,'stable');
+// 在任何消费者写入前验证另一个通道，避免随后发现 preview 损坏而留下半批副本。
+const previewRaw=await readFile(resolve(catalogDir,'preview.json'));
+verifyEnvelope(previewRaw.toString(),keys,'preview');
 if(option('app')){
   const out=resolve(option('app'),'entry/src/main/resources/rawfile/runtime-catalog');await mkdir(out,{recursive:true});
   await writeFile(resolve(out,'builtin.json'),JSON.stringify(stable,null,2)+'\n');
@@ -82,7 +88,7 @@ if(option('web')){
   await writeFile(resolve(contract,'source.json'),JSON.stringify(frozenContract.manifest,null,2)+'\n');
   await writeFile(resolve(out,'trusted-keys.json'),keysBytes);
   for(const channel of ['stable','preview']){
-    const raw=await readFile(resolve(catalogDir,channel+'.json'));verifyEnvelope(raw.toString(),keys,channel);
+    const raw=channel==='stable'?stableRaw:previewRaw;
     await writeFile(resolve(out,channel+'.json'),raw);
   }
 }

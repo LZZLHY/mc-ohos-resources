@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {generateKeyPairSync} from 'node:crypto';
+import {generateKeyPairSync,createHash} from 'node:crypto';
 import {projectCatalogV2,projectLegacyCatalog,validateCatalogV2,validateTransitionV2,assertPublishedHostCoverage} from '../lib/catalog-v2.mjs';
 import {signCatalog,verifyEnvelope} from '../tools/protocol.mjs';
 const original=JSON.parse(fs.readFileSync(new URL('../catalog/source.json',import.meta.url),'utf8'));
@@ -13,7 +13,11 @@ export function sourceFixture(){
  for(const b of source.builds)b.requiredHostProtocol=1;
  for(const r of source.runtimes){
    const old=r.recommendations.stable.recommendedBuildId;
-   const copy=structuredClone(source.builds.find(b=>b.id===old));copy.id=old+'-host2';copy.requiredHostProtocol=2;copy.legacyTags=[];source.builds.push(copy);
+   const copy=structuredClone(source.builds.find(b=>b.id===old));copy.id=old+'-host2';copy.requiredHostProtocol=2;copy.legacyTags=[];
+   // 新身份必须有自己的归档名及字节；R12闭包已禁止以另一个buildId复用旧文件名。
+   const bytes=Buffer.from('isolated-host2-fixture:'+r.id);
+   copy.archive={type:'zip',fileName:copy.id+'.zip',sizeBytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')};
+   copy.downloads=[{sourceId:'github',transport:'single-file',url:'https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/'+copy.archive.fileName}];source.builds.push(copy);
    delete r.loaderProtocol;r.minimumCatalogProtocol=2;
    r.recommendations={stable:{recommendationRevision:2,recommendedBuildIds:[old]},preview:{recommendationRevision:3,recommendedBuildIds:[copy.id,old]}};
  }
@@ -65,6 +69,15 @@ test('isolated CLI generates four verified namespace candidates and refuses over
    const success=spawnSync(process.execPath,command,{encoding:'utf8'});assert.equal(success.status,0,success.stderr);
    for(const version of[1,2])for(const channel of['stable','preview'])assert.equal(verifyEnvelope(fs.readFileSync(area+'/candidate/v'+version+'/'+channel+'.json','utf8'),keys,channel).schemaVersion,version);
    assert.notEqual(spawnSync(process.execPath,command,{encoding:'utf8'}).status,0);
+   // 第一代v2发布只有v1历史；仍验证两份v1，不能要求尚不存在的v2前代文件。
+   fs.mkdirSync(area+'/previous/v1',{recursive:true});
+   for(const channel of ['stable','preview'])fs.copyFileSync(area+'/candidate/v1/'+channel+'.json',area+'/previous/v1/'+channel+'.json');
+   const bootstrap=[...command.map(v=>v===area+'/candidate'?area+'/bootstrap':v),'--previous',area+'/previous'];
+   const migrated=spawnSync(process.execPath,bootstrap,{encoding:'utf8'});assert.equal(migrated.status,0,migrated.stderr);
+   fs.mkdirSync(area+'/previous/v2');fs.copyFileSync(area+'/candidate/v2/stable.json',area+'/previous/v2/stable.json');
+   const incomplete=spawnSync(process.execPath,bootstrap.map(v=>v===area+'/bootstrap'?area+'/partial':v),{encoding:'utf8'});
+   assert.notEqual(incomplete.status,0);assert.match(incomplete.stderr,/namespace is incomplete/);
+
    fs.writeFileSync(area+'/hosts.json','[]');const blocked=spawnSync(process.execPath,command.map(v=>v===area+'/candidate'?area+'/blocked':v),{encoding:'utf8'});assert.notEqual(blocked.status,0);assert.match(blocked.stderr,/PUBLIC_HOST_NOT_READY/);assert(!fs.existsSync(area+'/blocked'));
    fs.rmSync(area,{recursive:true});
  }catch(error){console.error('Failed isolated signing fixture retained at '+area);throw error;}

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "catalogRevision": 3,
-  "issuedAt": "2026-10-06T14:06:56Z",
+  "catalogRevision": 4,
+  "issuedAt": "2026-10-23T06:12:55Z",
   "expiresAt": "2027-09-26T18:16:22Z",
   "runtimes": [
     {
@@ -21,8 +21,9 @@
           "recommendedBuildId": "8u452-ohos-4"
         },
         "preview": {
-          "recommendationRevision": 3,
-          "recommendedBuildId": "8-runtime-link-rc1"
+          "recommendationRevision": 4,
+          "recommendedBuildId": "jdk8-ohos-20261022-repair12",
+          "loaderProtocol": 2
         }
       }
     },
@@ -43,8 +44,9 @@
           "recommendedBuildId": "17.0.13-ohos-5"
         },
         "preview": {
-          "recommendationRevision": 2,
-          "recommendedBuildId": "17-runtime-audio-rc2"
+          "recommendationRevision": 3,
+          "recommendedBuildId": "jdk17-ohos-20261022-repair12",
+          "loaderProtocol": 2
         }
       }
     },
@@ -65,8 +67,9 @@
           "recommendedBuildId": "21.0.5-ohos-7"
         },
         "preview": {
-          "recommendationRevision": 2,
-          "recommendedBuildId": "21-runtime-audio-rc2"
+          "recommendationRevision": 3,
+          "recommendedBuildId": "jdk21-ohos-20261022-repair12",
+          "loaderProtocol": 2
         }
       }
     },
@@ -87,8 +90,9 @@
           "recommendedBuildId": "25.0.4-ohos-2"
         },
         "preview": {
-          "recommendationRevision": 2,
-          "recommendedBuildId": "25-runtime-audio-rc2"
+          "recommendationRevision": 3,
+          "recommendedBuildId": "jdk25-ohos-20261022-repair12",
+          "loaderProtocol": 2
         }
       }
     }
@@ -580,6 +584,178 @@
           "CLS-AL00 / AMCL1.0.5（1000723）活动1791293040579正常更新成功，手机libjvm SHA-256 5689ecce217240b0dec9aa5fcc12320cadca732ccd46aebc22701558744e78f4与包内一致。",
           "活动1791294509496：JNI_CreateJavaVM返回0，jvmInit SUCCESS164ms；随后进入1.7.10 Forge与New World加载。",
           "后续原生第一现场为libgl4es.so+0xbd268 / gl4es_glMultiDrawArrays+0x2c8，SIGSEGV/SEGV_MAPERR，地址0x288；HotSpot最终abort。未把该游戏或完整设备矩阵标为通过。"
+        ]
+      },
+      "status": "available"
+    },
+    {
+      "id": "jdk8-ohos-20261022-repair12",
+      "runtimeId": "java8-ohos-aarch64",
+      "javaVersion": "1.8.0_452",
+      "legacyTags": [],
+      "archive": {
+        "type": "zip",
+        "fileName": "jdk8-ohos-20261022-repair12.zip",
+        "sizeBytes": 106780630,
+        "sha256": "0681bf5051e7be1e2761a6389c99fc2eaea5993b21c0ea07463f5a1f41230f94"
+      },
+      "downloads": [
+        {
+          "sourceId": "github",
+          "transport": "single-file",
+          "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk8-ohos-20261022-repair12.zip"
+        }
+      ],
+      "notes": [
+        "需要 loaderProtocol 2 宿主。包含应用 C++/展开器、TLS/装载生命周期、进程、字体及 JavaSound 双工/播放时间线修复；Native MIDI 为 API24 可选，设备 Ports 按平台能力提供。",
+        "修复原生临时目录与真实 UID 的 PerfData 命名；支持只读 Attach 和 jvmstat 共享计数，正常 VM 退出后清理 Attach socket 与 PerfData 路径。",
+        "本包已在 API26 MRDI-W10 平板通过基础/扩展 Java、字体、进程内工具、固定子进程命令、TCP/TLS/JFR、双 VM 工具与退出清理验证；范围按精确包身份记录。",
+        "该平板 FAST 48 kHz 录音首段满幅已在 JDK 执行前复现；具体 Native 平台原因未知，信号质量未取得资格，未以丢帧或关闭 FAST 掩盖。",
+        "手机、游戏及性能、独立 CLI/JLI、真实外设 I/O、最低 API 和 desktop 尚未取得完整资格。本批保持预览，不授予完整设备矩阵结论。"
+      ],
+      "capabilities": [
+        "headless-awt",
+        "duplex-requires-permission-and-device-test",
+        "ohmidi-api24-optional-midi1",
+        "device-ports-requires-device-test"
+      ],
+      "validationLevel": "artifact-audited",
+      "provenance": {
+        "kind": "source-build",
+        "sourceRepository": "https://github.com/openjdk/jdk8u-dev.git",
+        "sourceCommit": "35c254f58c70663df28cc7d15c9545c88250b6ce",
+        "manifestSha256": "152f224454c4aff13b161e80050f1e01658e8b92d8cd93ab7fb4a260bdf34e08",
+        "evidence": [
+          "完整runtime/source、音频/MIDI/Ports/native-temp和DT_NEEDED/SDK静态门按本包SHA核验；设备有限范围见发布验收记录。"
+        ]
+      },
+      "status": "available"
+    },
+    {
+      "id": "jdk17-ohos-20261022-repair12",
+      "runtimeId": "java17-ohos-aarch64",
+      "javaVersion": "17.0.19",
+      "legacyTags": [],
+      "archive": {
+        "type": "zip",
+        "fileName": "jdk17-ohos-20261022-repair12.zip",
+        "sizeBytes": 186682848,
+        "sha256": "177d2a936100ae015ae1e8351478d6269ce544170afaeff35d11a548de8f79bb"
+      },
+      "downloads": [
+        {
+          "sourceId": "github",
+          "transport": "single-file",
+          "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk17-ohos-20261022-repair12.zip"
+        }
+      ],
+      "notes": [
+        "需要 loaderProtocol 2 宿主。包含应用 C++/展开器、TLS/装载生命周期、进程、字体及 JavaSound 双工/播放时间线修复；Native MIDI 为 API24 可选，设备 Ports 按平台能力提供。",
+        "修复原生临时目录与真实 UID 的 PerfData 命名；支持只读 Attach 和 jvmstat 共享计数，正常 VM 退出后清理 Attach socket 与 PerfData 路径。",
+        "本包已在 API26 MRDI-W10 平板通过基础/扩展 Java、字体、进程内工具、固定子进程命令、TCP/TLS/JFR、双 VM 工具与退出清理验证；范围按精确包身份记录。",
+        "该平板 FAST 48 kHz 录音首段满幅已在 JDK 执行前复现；具体 Native 平台原因未知，信号质量未取得资格，未以丢帧或关闭 FAST 掩盖。",
+        "手机、游戏及性能、独立 CLI/JLI、真实外设 I/O、最低 API 和 desktop 尚未取得完整资格。本批保持预览，不授予完整设备矩阵结论。"
+      ],
+      "capabilities": [
+        "headless-awt",
+        "duplex-requires-permission-and-device-test",
+        "ohmidi-api24-optional-midi1",
+        "device-ports-requires-device-test"
+      ],
+      "validationLevel": "artifact-audited",
+      "provenance": {
+        "kind": "source-build",
+        "sourceRepository": "https://github.com/openjdk/jdk17u.git",
+        "sourceCommit": "b7d004b4f2787ea49454291d48326ad1cd97c0d0",
+        "manifestSha256": "ccc6691b3f72eeec35d5a93d6f0c140edbaa3f7dbbce9773ffffef5f13869d8c",
+        "evidence": [
+          "完整runtime/source、音频/MIDI/Ports/native-temp和DT_NEEDED/SDK静态门按本包SHA核验；设备有限范围见发布验收记录。"
+        ]
+      },
+      "status": "available"
+    },
+    {
+      "id": "jdk21-ohos-20261022-repair12",
+      "runtimeId": "java21-ohos-aarch64",
+      "javaVersion": "21.0.5",
+      "legacyTags": [],
+      "archive": {
+        "type": "zip",
+        "fileName": "jdk21-ohos-20261022-repair12.zip",
+        "sizeBytes": 199707105,
+        "sha256": "ed4032236aa8a7876fe0bed20b0294b19835be4baae4fbe5252f7d018159f27b"
+      },
+      "downloads": [
+        {
+          "sourceId": "github",
+          "transport": "single-file",
+          "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk21-ohos-20261022-repair12.zip"
+        }
+      ],
+      "notes": [
+        "需要 loaderProtocol 2 宿主。包含应用 C++/展开器、TLS/装载生命周期、进程、字体及 JavaSound 双工/播放时间线修复；Native MIDI 为 API24 可选，设备 Ports 按平台能力提供。",
+        "修复原生临时目录与真实 UID 的 PerfData 命名；支持只读 Attach 和 jvmstat 共享计数，正常 VM 退出后清理 Attach socket 与 PerfData 路径。",
+        "本包已在 API26 MRDI-W10 平板通过基础/扩展 Java、字体、进程内工具、固定子进程命令、TCP/TLS/JFR、双 VM 工具与退出清理验证；范围按精确包身份记录。",
+        "该平板 FAST 48 kHz 录音首段满幅已在 JDK 执行前复现；具体 Native 平台原因未知，信号质量未取得资格，未以丢帧或关闭 FAST 掩盖。",
+        "手机、游戏及性能、独立 CLI/JLI、真实外设 I/O、最低 API 和 desktop 尚未取得完整资格。本批保持预览，不授予完整设备矩阵结论。"
+      ],
+      "capabilities": [
+        "headless-awt",
+        "duplex-requires-permission-and-device-test",
+        "ohmidi-api24-optional-midi1",
+        "device-ports-requires-device-test"
+      ],
+      "validationLevel": "artifact-audited",
+      "provenance": {
+        "kind": "source-build",
+        "sourceRepository": "https://github.com/openjdk/jdk21u.git",
+        "sourceCommit": "dfcd8d2eecfe62e91070244d8eb10906dc3c812d",
+        "manifestSha256": "154d7cd7989eb8dec5c489ff598bf575d274d2414bae8236c8753f3d15f0b0fa",
+        "evidence": [
+          "完整runtime/source、音频/MIDI/Ports/native-temp和DT_NEEDED/SDK静态门按本包SHA核验；设备有限范围见发布验收记录。"
+        ]
+      },
+      "status": "available"
+    },
+    {
+      "id": "jdk25-ohos-20261022-repair12",
+      "runtimeId": "java25-ohos-aarch64",
+      "javaVersion": "25.0.4",
+      "legacyTags": [],
+      "archive": {
+        "type": "zip",
+        "fileName": "jdk25-ohos-20261022-repair12.zip",
+        "sizeBytes": 208941306,
+        "sha256": "2dcf30ab802b9a8550ff47587832fad21eceb54e6534e36bdf1efbc8831f9e93"
+      },
+      "downloads": [
+        {
+          "sourceId": "github",
+          "transport": "single-file",
+          "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk25-ohos-20261022-repair12.zip"
+        }
+      ],
+      "notes": [
+        "需要 loaderProtocol 2 宿主。包含应用 C++/展开器、TLS/装载生命周期、进程、字体及 JavaSound 双工/播放时间线修复；Native MIDI 为 API24 可选，设备 Ports 按平台能力提供。",
+        "修复原生临时目录与真实 UID 的 PerfData 命名；支持只读 Attach 和 jvmstat 共享计数，正常 VM 退出后清理 Attach socket 与 PerfData 路径。",
+        "本包已在 API26 MRDI-W10 平板通过基础/扩展 Java、字体、进程内工具、固定子进程命令、TCP/TLS/JFR、双 VM 工具与退出清理验证；范围按精确包身份记录。",
+        "该平板 FAST 48 kHz 录音首段满幅已在 JDK 执行前复现；具体 Native 平台原因未知，信号质量未取得资格，未以丢帧或关闭 FAST 掩盖。",
+        "手机、游戏及性能、独立 CLI/JLI、真实外设 I/O、最低 API 和 desktop 尚未取得完整资格。本批保持预览，不授予完整设备矩阵结论。"
+      ],
+      "capabilities": [
+        "headless-awt",
+        "duplex-requires-permission-and-device-test",
+        "ohmidi-api24-optional-midi1",
+        "device-ports-requires-device-test"
+      ],
+      "validationLevel": "artifact-audited",
+      "provenance": {
+        "kind": "source-build",
+        "sourceRepository": "https://github.com/openjdk/jdk25u.git",
+        "sourceCommit": "e8f9ebe5ea813b675410a89fbfafa22e42c04e6a",
+        "manifestSha256": "f33a54c60b6c33318ae9f52ceff6283cb9443d738247d78f66ef6fb4a74b7eea",
+        "evidence": [
+          "完整runtime/source、音频/MIDI/Ports/native-temp和DT_NEEDED/SDK静态门按本包SHA核验；设备有限范围见发布验收记录。"
         ]
       },
       "status": "available"

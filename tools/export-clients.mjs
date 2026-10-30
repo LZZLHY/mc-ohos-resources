@@ -20,6 +20,12 @@ if(option('app')){
 if(option('web')){
   const out=resolve(option('web'),'web/src/runtime/generated');await mkdir(out,{recursive:true});
   for(const name of ['catalog-validation.mjs','browser-catalog.mjs'])await copyFile(resolve(root,'lib',name),resolve(out,name));
+  // 官网部署校验器必须在clean clone自足，不能运行时穿越到维护者的兄弟资源仓。
+  const contract=resolve(option('web'),'scripts/runtime-catalog-contract'),manifest={schemaVersion:1,repository:'LZZLHY/mc-ohos-resources',files:{}};
+  for(const name of ['tools/protocol.mjs','lib/catalog-validation.mjs','lib/catalog-v2.mjs']){
+    const bytes=await readFile(resolve(root,name));const target=resolve(contract,name);await mkdir(dirname(target),{recursive:true});await writeFile(target,bytes);manifest.files[name]=sha256(bytes);
+  }
+  await writeFile(resolve(contract,'source.json'),JSON.stringify(manifest,null,2)+'\n');
   await writeFile(resolve(out,'trusted-keys.json'),keysBytes);
   for(const channel of ['stable','preview']){
     const raw=await readFile(resolve(catalogDir,channel+'.json'));verifyEnvelope(raw.toString(),keys,channel);

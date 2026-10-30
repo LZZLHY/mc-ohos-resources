@@ -12,6 +12,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {validateCatalog,validateTransition,verifyEnvelope,sha256} from './protocol.mjs';
 import {projectCatalog} from './catalog.mjs';
+import {projectCatalogV2} from '../lib/catalog-v2.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2),option=name=>{const i=args.indexOf('--'+name);return i<0?undefined:args[i+1];};
 const required=name=>{const v=option(name);if(!v)throw Error('--'+name+' required');return v;};
@@ -30,8 +31,9 @@ async function remoteIdentity(url,expected){
   return{url,sizeBytes:size,sha256:actual,verifiedAt:stamp()};
 }
 async function main(){
-  const source=JSON.parse(await readFile(resolve(root,'catalog/source.json'),'utf8'));
-  const catalog=projectCatalog(source,'preview');validateCatalog(catalog);
+  const sourcePath=resolve(option('source')||resolve(root,'catalog/source.json'));
+  const source=JSON.parse(await readFile(sourcePath,'utf8'));
+  const catalog=source.schemaVersion===2?projectCatalogV2(source,'preview'):projectCatalog(source,'preview');validateCatalog(catalog);
   if(args[0]==='assets'){
     const map=JSON.parse(await readFile(required('assets-map'),'utf8'));
     const sourceInputs=JSON.parse(await readFile(resolve(root,'provenance/build-inputs.json')));
@@ -53,15 +55,16 @@ async function main(){
       const asset=release.assets.find(a=>a.name===b.archive.fileName);
       if(!asset){if(release.immutable)throw Error('Release immutable; use a new batch tag');console.log('Uploading '+b.archive.fileName);gh('release','upload',tag,map[b.archive.fileName],'--repo',repo);}
     }
-    const receipt={schemaVersion:1,verificationStartedAt:stamp(),sourceSha256:sha256(await readFile(resolve(root,'catalog/source.json'))),assets:[]};
+    const receipt={schemaVersion:1,verificationStartedAt:stamp(),sourceSha256:sha256(await readFile(sourcePath)),assets:[]};
     for(const b of targets){const d=b.downloads.find(d=>d.sourceId==='github');receipt.assets.push(await remoteIdentity(d.url,b.archive));console.log('Verified '+b.archive.fileName);}
     receipt.finishedAt=stamp();const out=resolve(required('receipt'));await mkdir(dirname(out),{recursive:true});await writeFile(out,JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});return;
   }
   if(args[0]==='activate'){
+    if(source.schemaVersion===2)throw Error('v2 requires namespace candidates and verified projection receipt; legacy activate cannot overwrite them');
     const keys=JSON.parse(await readFile(resolve(root,'catalog/trusted-keys.json')));
     const candidate=resolve(required('catalog-dir'));
     const receipt=JSON.parse(await readFile(required('receipt')));
-    if(receipt.sourceSha256!==sha256(await readFile(resolve(root,'catalog/source.json'))))throw Error('source changed since asset verification');
+    if(receipt.sourceSha256!==sha256(await readFile(sourcePath)))throw Error('source changed since asset verification');
     for(const b of catalog.builds.filter(b=>b.provenance.kind==='source-build')){
       if(!receipt.assets.some(a=>a.sha256===b.archive.sha256&&a.sizeBytes===b.archive.sizeBytes&&a.url===b.downloads.find(d=>d.sourceId==='github').url))throw Error('missing asset receipt '+b.id);
     }
@@ -79,7 +82,7 @@ async function main(){
     console.log('Activated verified local catalog files. Commit and push these exact bytes; mirror the same files.');return;
   }
   if(args[0]==='verify-web'){
-    const receipt={schemaVersion:1,verificationStartedAt:stamp(),sourceSha256:sha256(await readFile(resolve(root,'catalog/source.json'))),assets:[]};
+    const receipt={schemaVersion:1,verificationStartedAt:stamp(),sourceSha256:sha256(await readFile(sourcePath)),assets:[]};
     for(const b of catalog.builds){const d=b.downloads.find(d=>d.sourceId==='web');if(d){receipt.assets.push(await remoteIdentity(d.url,b.archive));console.log('Verified web '+b.archive.fileName);}}
     receipt.finishedAt=stamp();await writeFile(resolve(required('receipt')),JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});return;
   }

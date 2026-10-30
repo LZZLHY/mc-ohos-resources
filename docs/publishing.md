@@ -51,3 +51,33 @@ node tools/export-clients.mjs --catalog-dir catalog/v1 --app <MyApplication> --w
 客户端拒绝未验签、未知 schema、重复身份、内容漂移和降代次。目录失败不删除安装；新包和 receipt 在 staging 验证后一起切换，在用时受租约保护。
 
 服务器包只追加，每次发布保留旧目录/网页和 nginx include。正常业务回滚发布更高代次的旧 build 推荐；紧急恢复旧文件只是临时可用性措施，新客户端不会接受低代次覆盖已接受高代次。每次 receipt 的 archive 字段给出恢复资料，不能靠清空客户端缓存绕过规则。
+
+
+## v2 候选与旧端兼容
+
+`tools/catalog-v2.mjs` 消费显式 schemaVersion 2 的源：每 build 必填
+`requiredHostProtocol`，runtime 不再携带 loaderProtocol/recommendedBuildId，而在每通道
+recommendations 中维护有序 `recommendedBuildIds`（最多八项，可以为空）。宿主要求为
+不可变身份，修改必须新 buildId。空 v2 推荐可以停止新下载；旧端 v1 不能表达同一语义，
+没有安全协议 1 替代时生成器报 `V1_NO_SAFE_RECOMMENDATION`，不能假标协议/复活撤回包。
+
+普通生成按 `--source <v2-source.json>` 指定输入，不改当前 source.json 或 catalog/v1 原件。
+先用 `publish.mjs assets --source <同一v2源> ...` 完整读回不可变资产；再运行：
+
+```powershell
+node tools/catalog-v2.mjs generate --source <v2-source.json> --asset-receipt <readback.json> --key <仓外私钥> --keys catalog/trusted-keys.json --kid amcl-runtime-2026-01 --previous <含v1/v2的上代目录> --out <全新候选目录>
+```
+
+生成器直接读取官网已发布 App stable/preview 的 runtime-host 审计接口，要求每个推荐
+都有可达的公开宿主；JDK stable 必须有 App stable，不接受 developer 或 staged 收据。
+输出 v1/v2 各两个签名目录和 projection-receipt.json（sourceSha256、逻辑代次与四文件
+SHA/大小）。收据用于同批对账，不能替代 JWS 固定公钥验签。旧 activate 明确拒绝 v2，
+后续部署使用显式格式命名空间及该批收据，不用旧工具覆盖新目录。
+
+离线测试仅允许 `--fixture --hosts <隔离宿主夹具>`，回执 fixtureOnly 为 true；不能把
+这些测试候选作为公开发行证明。测试通过不等于当前宿主已实现协议 2。
+`export-clients.mjs --web` 也复制独立 Node 验证所需的 tools/protocol.mjs 与两个纯验证
+模块，并记录逐文件摘要，官网 clean clone 不依赖维护者相邻仓。
+
+本轮仅实现并验证候选工具，没有更换线上 revision、推荐、JDK ZIP 或生产私钥。旧稳定
+JDK8 的合格替代、旧 Native/协议2候选整合与组合设备资格仍需分别闭合后再授权发行。

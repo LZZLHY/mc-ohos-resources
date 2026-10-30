@@ -8,8 +8,16 @@ import { createHash, createPublicKey, sign, verify } from 'node:crypto';
 export const MAX_CATALOG_BYTES = 1024 * 1024;
 export const TYPE = 'amcl-runtime-catalog+jws';
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
-import { validateCatalog, validateTransition, buildIdentity, runtimeIdentity } from '../lib/catalog-validation.mjs';
-export { validateCatalog, validateTransition, buildIdentity, runtimeIdentity };
+import { validateCatalog as validateV1, validateTransition as transitionV1, buildIdentity, runtimeIdentity } from '../lib/catalog-validation.mjs';
+import { validateCatalogV2, validateTransitionV2 } from '../lib/catalog-v2.mjs';
+export { buildIdentity, runtimeIdentity };
+/** schema是签名payload的一部分；v1仍严格拒绝v2新增字段，绝不静默降级解释。 */
+export function validateCatalog(c,channel){return c?.schemaVersion===2?validateCatalogV2(c,channel):validateV1(c,channel);}
+/** 两投影不能逐字比较；发布工具按独立版本命名空间各自核对前代。 */
+export function validateTransition(previous,next){
+  if(previous&&previous.schemaVersion!==next.schemaVersion)throw Error('catalog format namespace mismatch');
+  return next.schemaVersion===2?validateTransitionV2(previous,next):transitionV1(previous,next);
+}
 function assert(test, message) { if (!test) throw new Error(message); }
 function object(x, name, keys) {
   assert(x !== null && typeof x === 'object' && !Array.isArray(x),name+': expected object');

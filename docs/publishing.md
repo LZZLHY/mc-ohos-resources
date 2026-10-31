@@ -249,7 +249,9 @@ reader/交接契约；与宿主ABI[1,2]和minimumCatalogProtocol<=2分别计数�
 缺宿主协议时两JDK通道继续留合格替代，直到当前stable真正覆盖。历史不授予当前forward
 可下载资格，staged/developer不入账，blob丢失或退役不删除发布事实。仅登记未来3且没有
 真实官方HAP历史支持，不产生假义务。
-生产闭包不再接受只有latest数组：当前头必须绑定同批历史快照。新库从首笔发布起记账；
+生产闭包不再接受只有latest数组：当前头必须绑定同批历史快照；两产品全局historyRevision
+及各自publicationCount须一致，跨提交读取会明确重试，不把分页截断当完整历史。
+新库从首笔发布起记账；
 旧库无法恢复已被覆盖头，coverage=legacy-unknown明确阻断未来生产生成/激活，不能用
 管理员布尔、清历史或假旧用户已迁移解决。迁移所需原始证据及离线复核方案见官网
 deploy/RUNTIME-HOST-HISTORY-MIGRATION.md；生产回填不属于本轮代码授权。

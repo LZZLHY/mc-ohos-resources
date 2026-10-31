@@ -214,6 +214,8 @@ test('只有latest数组、历史覆盖未知、当前头无历史绑定、404�
   assert.throws(()=>deriveContract(catalogs(sourceFixture()),incomplete),/PUBLIC_HOST_HISTORY_INCOMPLETE:desktop/);
   const unbound=publishedHostFacts(hosts(),[]);
   assert.throws(()=>deriveContract(catalogs(sourceFixture()),unbound),/HEAD_HISTORY_MISMATCH/);
+  const mixed=publishedHostFacts(hosts());mixed.products[1].historyRevision++;
+  assert.throws(()=>deriveContract(catalogs(sourceFixture()),mixed),/SNAPSHOT_CHANGED_RETRY/);
   await assert.rejects(fetchPublishedRuntimeHosts(async()=>new Response('',{status:404})),/PUBLIC_HOST_HTTP:404/);
   const tooMany=publishedHostFacts(hosts());tooMany.products[0].publications=Array.from({length:257},()=>hosts()[0]);
   assert.throws(()=>deriveContract(catalogs(sourceFixture()),tooMany),/PUBLIC_HOST_HISTORY_LIMIT/);

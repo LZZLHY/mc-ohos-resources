@@ -205,7 +205,7 @@ test('interruption after first channel is gated and idempotently resumes exact b
     const product=new URL(url).searchParams.get('product');
     return Response.json(publicFacts(product,channel=>publishedHost({product,channel,runtimeHostProtocols:channel==='stable'?[1]:[1,2],runtimePlanProtocol:channel==='stable'?0:2})));
   };
-  await assert.rejects(activateCatalog({root,candidateDir:candidate,receiptPath:receipt,transactionDir:transaction,fetchImpl:blockedHosts}),/STABLE_RETURN_PLAN_REQUIRED/);
+  await assert.rejects(activateCatalog({root,candidateDir:candidate,receiptPath:receipt,transactionDir:transaction,fetchImpl:blockedHosts}),/STABLE_RETURN_(?:PLAN_REQUIRED|READER_NOT_COVERED)/);
   await assertNoPendingActivation(root);
   await assert.rejects(readFile(resolve(transaction,'transaction.json')),error=>error.code==='ENOENT');
   await assert.rejects(activateCatalog({root,candidateDir:candidate,receiptPath:receipt,transactionDir:transaction,fetchImpl:publicHostFetch,

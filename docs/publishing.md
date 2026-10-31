@@ -249,6 +249,10 @@ reader/交接契约；与宿主ABI[1,2]和minimumCatalogProtocol<=2分别计数�
 缺宿主协议时两JDK通道继续留合格替代，直到当前stable真正覆盖。历史不授予当前forward
 可下载资格，staged/developer不入账，blob丢失或退役不删除发布事实。仅登记未来3且没有
 真实官方HAP历史支持，不产生假义务。
+ready且实际可公开人工下载的GitHub官方原件不是私有staged：审核转ready时独立记录
+official-download-exposure，使用exposureId，不造channel/publicationId；正式/预览类别
+仍来自真实HAP。pub和exposure共同覆盖已装cohort，当前forward仍只认实际通道头。
+同ABI也必须覆盖历史reader2，不能以具体小数据的旧reader0/1兼容个案授予普遍发布资格。
 生产闭包不再接受只有latest数组：当前头必须绑定同批历史快照；两产品全局historyRevision
 及各自publicationCount须一致，跨提交读取会明确重试，不把分页截断当完整历史。
 新库从首笔发布起记账；

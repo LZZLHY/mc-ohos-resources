@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash,generateKeyPairSync} from 'node:crypto';
 import {projectCatalogV2,derivePublishedReleaseClosure as deriveContract,fetchPublishedRuntimeHosts,validateTransitionV2,projectLegacyCatalogFromV2,assertLegacyReturnCoverage} from '../lib/catalog-v2.mjs';
-import {publishedHost,publishedHostFacts} from './fixtures/published-host.mjs';
+import {publishedHost,publishedHostFacts,officialExposure} from './fixtures/published-host.mjs';
 import {assertIsolatedFixtureKey,signCatalog,verifyEnvelope} from '../tools/protocol.mjs';
 import {validateTransition as validateV1Transition} from '../lib/catalog-validation.mjs';
 const original=JSON.parse(fs.readFileSync(new URL('../catalog/source.json',import.meta.url),'utf8'));
@@ -115,7 +115,7 @@ test('只有真实stable宿主覆盖历史能力才解除义务；停止推荐�
   assert.throws(()=>derivePublishedReleaseClosure(catalogs(source),[...caughtUp,...desktop],['sideload','desktop']),/STABLE_RETURN_JDK_NOT_QUALIFIED:desktop/);
   // 显式phone发布范围不能屏蔽实际desktop消费者，但两头不存在不制造占位要求。
   desktop[0].runtimePlanProtocol=0;
-  assert.throws(()=>derivePublishedReleaseClosure(catalogs(qualified),[...caughtUp,...desktop],['sideload']),/STABLE_RETURN_PLAN_REQUIRED:desktop/);
+  assert.throws(()=>derivePublishedReleaseClosure(catalogs(qualified),[...caughtUp,...desktop],['sideload']),/STABLE_RETURN_(?:PLAN_REQUIRED|READER_NOT_COVERED):desktop/);
   desktop[0].runtimePlanProtocol=2;
   const scoped=derivePublishedReleaseClosure(catalogs(qualified),[...caughtUp,...desktop],['sideload']);
   assert.deepEqual(scoped.products,['sideload']);assert.deepEqual(scoped.returnProducts,['desktop']);
@@ -221,15 +221,36 @@ test('只有latest数组、历史覆盖未知、当前头无历史绑定、404�
   assert.throws(()=>deriveContract(catalogs(sourceFixture()),tooMany),/PUBLIC_HOST_HISTORY_LIMIT/);
 });
 
+test('已可手工下载的真实官方原件独立形成exposure，不造publication也不能充当forward头',()=>{
+  const source=retireHost2(sourceFixture(),{withdrawn:true}),manual=officialExposure(hosts()[1]);
+  const current=['stable','preview'].map(channel=>publishedHost({channel,versionName:'2.1.0',versionCode:2000001,runtimeHostProtocols:[1]}));
+  const facts=publishedHostFacts(current,current,[manual]),proof=deriveContract(catalogs(source),facts);
+  assert.equal(proof.returns.length,2);assert(proof.returns.every(r=>r.fromHost.includes('/exposure/')));
+  assert.equal(Object.hasOwn(proof.hostFacts.products[1].exposures[0],'publicationId'),false);
+  const unsafe=retireHost2(source,{channel:'stable',qualified:false});
+  assert.throws(()=>deriveContract(catalogs(unsafe),facts),/STABLE_RETURN_JDK_NOT_QUALIFIED/);
+  const fake=publishedHostFacts(current,current,[{...manual,publicationId:'a'.repeat(64)}]);
+  assert.throws(()=>deriveContract(catalogs(source),fake),/PUBLIC_HOST_EXPOSURE_IDENTITY_INVALID/);
+  const newRecommended=sourceFixture();
+  assert.throws(()=>deriveContract(catalogs(newRecommended),facts),/PUBLIC_HOST_NOT_READY/);
+});
+
+test('stable同ABI也须覆盖已公开reader2，旧0/1小数据兼容不授予发布级普遍资格',()=>{
+  const source=retireHost2(sourceFixture()),old=hosts(),current=['stable','preview'].map(channel=>publishedHost({channel,versionName:'2.1.0',versionCode:2000001,runtimePlanProtocol:1}));
+  assert.throws(()=>deriveContract(catalogs(source),publishedHostFacts(current,[...old,...current])),/STABLE_RETURN_READER_NOT_COVERED/);
+  current[0].runtimePlanProtocol=2;
+  assert.equal(deriveContract(catalogs(source),publishedHostFacts(current,[...old,...current])).returns.length,0);
+});
+
 test('旧stable plan0、有预览App且正向可跑2，仍必须禁止自动正式回退闭包',()=>{
   const current=hosts();current[0].runtimePlanProtocol=0;current[0].canReturn=true;
-  assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),current),/STABLE_RETURN_PLAN_REQUIRED/);
+  assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),current),/STABLE_RETURN_(?:PLAN_REQUIRED|READER_NOT_COVERED)/);
 });
 
 test('旧plan1可识别但不授予新的跨宿主恢复资格；reader2两端真实声明才合格，未知3拒绝',()=>{
   for(const index of [0,1]){
     const current=hosts();current[index].runtimePlanProtocol=1;
-    assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),current),/STABLE_RETURN_PLAN_REQUIRED/);
+    assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),current),/STABLE_RETURN_(?:PLAN_REQUIRED|READER_NOT_COVERED)/);
   }
   const ordinary=hosts();ordinary[0].runtimeHostProtocols=[1,2];ordinary[0].runtimePlanProtocol=1;ordinary[1].runtimePlanProtocol=0;
   assert.equal(derivePublishedReleaseClosure(catalogs(sourceFixture()),ordinary).returns.length,0);

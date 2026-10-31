@@ -10,8 +10,13 @@ export function publishedHost({product='sideload',channel='stable',versionName=c
     minApi,abi:'arm64-v8a',deviceTypes,runtimeHostProtocols,runtimePlanProtocol};
 }
 /** 隔离发布账从空库起记录完整历史；与生产固定facts接口同形，不是可供生产CLI读取的证明。 */
-export function publishedHostFacts(heads,publications=heads){
+export function publishedHostFacts(heads,publications=heads,exposures=[]){
   return{schema:1,products:['sideload','desktop'].map(product=>({schema:1,product,coverage:'complete',
-    historyRevision:publications.length,publicationCount:publications.filter(h=>h.product===product).length,
-    heads:heads.filter(h=>h.product===product),publications:publications.filter(h=>h.product===product)}))};
+    historyRevision:publications.length+exposures.length,publicationCount:publications.filter(h=>h.product===product).length,exposureCount:exposures.filter(h=>h.product===product).length,
+    heads:heads.filter(h=>h.product===product),publications:publications.filter(h=>h.product===product),exposures:exposures.filter(h=>h.product===product)}))};
+}
+export function officialExposure(host){
+  const {channel,publicationId,...artifact}=host;
+  return{...artifact,kind:'official-download-exposure',exposureId:createHash('sha256').update('download:'+host.product+'/'+host.sha256).digest('hex'),
+    githubUrl:'https://github.com/LZZLHY/amcl/releases/download/'+host.tag+'/'+host.name};
 }

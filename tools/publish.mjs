@@ -77,7 +77,7 @@ export async function main(args=process.argv.slice(2)){
     // v2须使用四份命名空间成品及投影收据；旧两文件事务不能覆盖这些身份。
     if(option('source') && JSON.parse(await readFile(resolve(option('source')),'utf8')).schemaVersion===2)
       throw Error('v2 requires namespace candidates and verified projection receipt; legacy activate cannot overwrite them');
-    const journal=await activateCatalog({root,candidateDir:resolve(required('catalog-dir')),
+    const journal=await activateCatalog({root,candidateDir:resolve(required('catalog-dir')),products:(option('products')??'sideload').split(','),
       receiptPath:resolve(required('receipt')),transactionDir:resolve(required('transaction-dir'))});
     console.log('Activated and read back both local channels. Transaction: '+journal.closureSha256+'. Commit/push these exact files, then verify remote channels.');return;
   }

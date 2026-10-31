@@ -213,3 +213,31 @@ R12的实际来源ZIP、Fontconfig/FreeType、音频、MIDI、Ports、native-tem
 
 应用组合分支已接入真实协议2宿主及新旧安装journal恢复，具体SDK/设备资格由应用收据
 单独记录。本轮不上传、不推送、不激活推荐，也不把工具测试通过写成公共宿主已经上线。
+
+## 发布资格中的稳定返回闭包
+
+本批App产品用 `--products sideload` 或显式 `--products sideload,desktop` 指定，默认仅
+sideload，也允许desktop-only。不会因为历史存在desktop头就扩大本批，不造缺失产品占位。
+纳入的产品分别读取固定官网runtime-host接口，要求真实公开GitHub HAP的文件名、完整
+SHA/大小、publicationId、源码修订、设备/API/ABI、宿主集合和恢复协议；不接受developer、
+staged、其它产品的HAP或表单“可返回”声明。未纳入产品保持既有v1/按真实宿主选择的
+兼容投影，不承诺该产品获得新宿主能力。
+
+结构 `check` 只说明候选格式，不能称公开发行资格通过。生产 `generate` 在读私钥前
+验证来源/全量原件收据，并派生正向与返回两图：每个推荐先有本批产品的公开App；预览
+引入stable未支持的宿主时，两端须支持恢复协议1，stable不能降低安装code或设备/API
+范围。当前JDK通道每个受支持major都须有同时被两端宿主支持、未撤回、source-build且
+device-matrix-tested的推荐替代，绑定精确build/归档SHA/大小/来源收据。legacy例外只能
+保留历史下载，不能凑恢复资格。普通不降低宿主能力的维护不强迫旧stable升级恢复协议。
+缺桥接stable或任何安全替代即阻断签名，不机械发布当前旧稳定JDK8作为“回退”。
+
+新projection-receipt为schemaVersion2，绑定本批产品、生成时闭包、精确源/原件闭包摘要
+和四份签名文件。源在异步校验期间变化会拒绝，不会给旧payload写新source摘要。
+receipt只作对账索引，权威仍是固定公钥JWS及真正激活时从官网重算的公开HAP/返回图。
+官网v2激活必须带该批收据；legacy activate也重新核公开依赖，不因旧格式绕开返回门。
+依赖HAP变化但新图仍合格时，可按同一JDK候选恢复，并另存当轮实际HAP闭包证明；
+旧证明不被改写或谎称仍新鲜。新图不合格则保持激活保护与明确原因。
+
+`--fixture` 只允许隔离密钥：按SPKI拒绝与仓内固定生产公钥相同的key，改kid或改
+`--keys` 文件不能绕过。fixture文件可作本地结构/签名测试，但不能作为公开激活依据。
+本轮测试使用临时key和隔离网络边界，不签真实目录、不更换现有source、feeds或推荐。

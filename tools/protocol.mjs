@@ -8,6 +8,12 @@ import { createHash, createPublicKey, sign, verify } from 'node:crypto';
 export const MAX_CATALOG_BYTES = 1024 * 1024;
 export const TYPE = 'amcl-runtime-catalog+jws';
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+/** fixture只可用隔离密钥；比较真实SPKI，不能改kid或另提供keys文件后误用生产私钥。 */
+export function assertIsolatedFixtureKey(key,pinnedKeys){
+  const spki=createPublicKey(key).export({type:'spki',format:'der'});
+  assert(!pinnedKeys.keys.some(item=>typeof item.spki==='string'&&spki.equals(Buffer.from(item.spki,'base64'))),
+    'FIXTURE_KEY_IS_PRODUCTION');
+}
 import { validateCatalog as validateV1, validateTransition as transitionV1, buildIdentity, runtimeIdentity } from '../lib/catalog-validation.mjs';
 import { validateCatalogV2, validateTransitionV2 } from '../lib/catalog-v2.mjs';
 export { buildIdentity, runtimeIdentity };

@@ -8,6 +8,7 @@ import {resolve,relative,isAbsolute,dirname} from 'node:path';
 import {readDeliveryClosure,validateDeliveryReceipt} from './delivery.mjs';
 import {sha256,verifyEnvelope,validateTransition} from './protocol.mjs';
 import {projectCatalog} from './catalog.mjs';
+import {fetchPublishedRuntimeHosts,derivePublishedReleaseClosure,validateReleaseProducts} from '../lib/catalog-v2.mjs';
 
 const markerPath=root=>resolve(root,'catalog/.activation-pending.json');
 const assert=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -33,8 +34,9 @@ async function replaceFile(path,bytes,identity) {
   await rename(temporary,path);
 }
 
-export async function activateCatalog({root,candidateDir,receiptPath,transactionDir,afterReplace=()=>{}}) {
+export async function activateCatalog({root,candidateDir,receiptPath,transactionDir,afterReplace=()=>{},fetchImpl=globalThis.fetch,products=['sideload']}) {
   root=resolve(root);transactionDir=resolve(transactionDir);
+  products=validateReleaseProducts(products);
   const rel=relative(root,transactionDir);
   assert(rel.startsWith('..') || isAbsolute(rel),'activation transaction directory must be outside repository');
   const closure=await readDeliveryClosure(root),keys=JSON.parse(await readFile(resolve(root,'catalog/trusted-keys.json')));
@@ -57,8 +59,13 @@ export async function activateCatalog({root,candidateDir,receiptPath,transaction
       (current===null ? row.previousSha256===null : [row.previousSha256,row.nextSha256].includes(sha256(current))),
       'activation previous/candidate/current bytes changed: '+channel);
     if(previous)validateTransition(verifyEnvelope(previous.toString(),keys,channel,Date.now(),true),catalog);
-    prepared.push({channel,bytes,previous,path});
+    prepared.push({channel,bytes,previous,path,catalog});
   }
+  // 签名/旧资产收据不代表依赖永远有效：真正激活前从固定官网重读实际公开HAP并派生返回图。
+  const releaseClosure=derivePublishedReleaseClosure(prepared.map(item=>item.catalog),await fetchPublishedRuntimeHosts(fetchImpl,products),products);
+  const releaseCheck={schemaVersion:1,checkedAt:new Date().toISOString(),sourceSha256:closure.sourceSha256,
+    catalogFiles:Object.fromEntries(prepared.map(item=>[item.channel,sha256(item.bytes)])),releaseClosure};
+  const releaseBytes=Buffer.from(JSON.stringify(releaseCheck,null,2)+'\n'),releaseHash=sha256(releaseBytes);
   // 所有签名、资产、来源和代次验证先完成，再建立日志和写者标记。
   if(!journal){
     await mkdir(transactionDir,{recursive:true});
@@ -70,6 +77,15 @@ export async function activateCatalog({root,candidateDir,receiptPath,transaction
       receiptSha256:sha256(receiptRaw),channels:prepared.map(i=>({channel:i.channel,nextSha256:sha256(i.bytes),previousSha256:i.previous?sha256(i.previous):null}))};
     await durableWrite(journalPath,JSON.stringify(journal,null,2)+'\n');
   }
+  // HAP头变化但新图仍合格时允许按原候选恢复；新验证另存精确证据，不改写先前事实。
+  const releaseFile=resolve(transactionDir,'release-closure-'+releaseHash+'.json');
+  const priorCheck=await optionalRead(releaseFile);
+  if(priorCheck)assert(priorCheck.equals(releaseBytes),'release closure evidence changed');
+  else await durableWrite(releaseFile,releaseBytes);
+  journal.releaseClosureChecks=journal.releaseClosureChecks??[];
+  journal.releaseClosureChecks.push({file:'release-closure-'+releaseHash+'.json',sha256:releaseHash,checkedAt:releaseCheck.checkedAt});
+  const checkedJournal=Buffer.from(JSON.stringify(journal,null,2)+'\n');
+  await replaceFile(journalPath,checkedJournal,sha256(checkedJournal));
   assert((await readDeliveryClosure(root)).closureSha256===closure.closureSha256,'delivery inputs changed during activation preflight');
   if(!markerRaw)await durableWrite(markerPath(root),JSON.stringify({schemaVersion:1,root,transactionDir,closureSha256:closure.closureSha256})+'\n');
   await mkdir(resolve(root,'catalog/v1'),{recursive:true});
@@ -81,7 +97,8 @@ export async function activateCatalog({root,candidateDir,receiptPath,transaction
   for(const item of prepared)assert((await readFile(item.path)).equals(item.bytes),'activated catalog readback mismatch');
   assert((await readDeliveryClosure(root)).closureSha256===closure.closureSha256,'delivery inputs changed during activation; transaction remains pending');
   journal.state='complete';journal.completedAt=new Date().toISOString();
-  await replaceFile(journalPath,Buffer.from(JSON.stringify(journal,null,2)+'\n'),closure.closureSha256);
+  const completeJournal=Buffer.from(JSON.stringify(journal,null,2)+'\n');
+  await replaceFile(journalPath,completeJournal,sha256(completeJournal));
   await unlink(markerPath(root));
   return journal;
 }

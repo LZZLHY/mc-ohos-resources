@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {generateKeyPairSync,createHash} from 'node:crypto';
 import {projectCatalogV2,projectLegacyCatalog,validateCatalogV2,validateTransitionV2,assertPublishedHostCoverage} from '../lib/catalog-v2.mjs';
 import {signCatalog,verifyEnvelope} from '../tools/protocol.mjs';
+import {publishedHost} from './fixtures/published-host.mjs';
 const original=JSON.parse(fs.readFileSync(new URL('../catalog/source.json',import.meta.url),'utf8'));
 export function sourceFixture(){
  const source=structuredClone(original);source.schemaVersion=2;source.catalogRevision++;
@@ -64,7 +65,7 @@ test('isolated CLI generates four verified namespace candidates and refuses over
  try{
    const pair=generateKeyPairSync('ec',{namedCurve:'prime256v1'}),keys={keys:[{kid:'fixture',algorithm:'ES256',spki:pair.publicKey.export({format:'der',type:'spki'}).toString('base64')}]};
    fs.writeFileSync(area+'/key.pem',pair.privateKey.export({format:'pem',type:'pkcs8'}),{mode:0o600});fs.writeFileSync(area+'/keys.json',JSON.stringify(keys));fs.writeFileSync(area+'/source.json',JSON.stringify(sourceFixture()));
-   const host={schema:1,product:'sideload',channel:'stable',sha256:'a'.repeat(64),tag:'v1.0.6',versionCode:1000910,runtimeHostProtocols:[1,2]};fs.writeFileSync(area+'/hosts.json',JSON.stringify([host]));
+   const host=publishedHost();fs.writeFileSync(area+'/hosts.json',JSON.stringify([host]));
    const command=['tools/catalog-v2.mjs','generate','--fixture','--source',area+'/source.json','--hosts',area+'/hosts.json','--key',area+'/key.pem','--keys',area+'/keys.json','--kid','fixture','--out',area+'/candidate'];
    const success=spawnSync(process.execPath,command,{encoding:'utf8'});assert.equal(success.status,0,success.stderr);
    for(const version of[1,2])for(const channel of['stable','preview'])assert.equal(verifyEnvelope(fs.readFileSync(area+'/candidate/v'+version+'/'+channel+'.json','utf8'),keys,channel).schemaVersion,version);
@@ -78,7 +79,7 @@ test('isolated CLI generates four verified namespace candidates and refuses over
    const incomplete=spawnSync(process.execPath,bootstrap.map(v=>v===area+'/bootstrap'?area+'/partial':v),{encoding:'utf8'});
    assert.notEqual(incomplete.status,0);assert.match(incomplete.stderr,/namespace is incomplete/);
 
-   fs.writeFileSync(area+'/hosts.json','[]');const blocked=spawnSync(process.execPath,command.map(v=>v===area+'/candidate'?area+'/blocked':v),{encoding:'utf8'});assert.notEqual(blocked.status,0);assert.match(blocked.stderr,/PUBLIC_HOST_NOT_READY/);assert(!fs.existsSync(area+'/blocked'));
+   fs.writeFileSync(area+'/hosts.json','[]');const blocked=spawnSync(process.execPath,command.map(v=>v===area+'/candidate'?area+'/blocked':v),{encoding:'utf8'});assert.notEqual(blocked.status,0);assert.match(blocked.stderr,/PUBLIC_STABLE_BASELINE_REQUIRED/);assert(!fs.existsSync(area+'/blocked'));
    fs.rmSync(area,{recursive:true});
  }catch(error){console.error('Failed isolated signing fixture retained at '+area);throw error;}
 });

@@ -228,7 +228,7 @@ staged、其它产品的HAP或表单“可返回”声明。返回证明用retur
 
 结构 `check` 只说明候选格式，不能称公开发行资格通过。生产 `generate` 在读私钥前
 验证来源/全量原件收据，并派生正向与返回两图：每个推荐先有本批产品的公开App；预览
-引入stable未支持的宿主时，两端须支持恢复协议1，stable不能降低安装code或设备/API
+引入stable未支持的宿主时，两端须真实声明恢复协议2，stable不能降低安装code或设备/API
 范围。只要两目录保留历史build要求仍被公开preview支持而stable不支持，即使该build
 已退出推荐或已撤回，也可能仍装在用户槽中，返回义务持续到真实stable宿主覆盖为止。
 仅登记且无公开preview支持的未来协议候选不会据此要求发布未来App。
@@ -239,6 +239,15 @@ device-matrix-tested的推荐替代，绑定精确build/归档SHA/大小/来源�
 仅在legacy后面追加安全fallback会阻断，须明确调整推荐顺序而不能伪造矩阵级别。
 证明列出触发义务的历史build状态/SHA及每通道精确替代。普通无历史能力差异的维护
 不强迫旧stable升级恢复协议。
+恢复协议2专指1MiB收据、compact/legacy槽身份、schema2续作intent及耐久completion的
+reader/交接契约；与宿主ABI[1,2]和minimumCatalogProtocol<=2分别计数。旧plan1仍按
+真实入包值识别，但不授予本轮新跨宿主返回资格；无新JDK副作用的普通路径可保持0/1，
+历史已在途plan1由客户端原binding安全恢复，不改写旧发行审计或假设旧reader已升级。
+同runtime ID保存历史可安装范围：minimumApi或minimumCatalogProtocol不能随加代次
+提高，不能让API26旧槽因整体API27门槛连安全替代也看不到。平台身份保持不可变；需要
+新平台/新目录协议时须先设计明确演进，不能用全局runtime字段退休已安装用户。
+当前生产准入与客户端supportsRuntime一致，仅接受ohos/aarch64/musl、已实现adapter、
+minimumCatalogProtocol<=2；结构check仍能检查未来候选，不授予签名激活资格。
 缺桥接stable或任何安全替代即阻断签名，不机械发布当前旧稳定JDK8作为“回退”。
 
 新projection-receipt为schemaVersion2，绑定本批产品、生成时闭包、精确源/原件闭包摘要
@@ -248,6 +257,10 @@ receipt只作对账索引，权威仍是固定公钥JWS及真正激活时从官�
 有返回义务的新v2官网激活还核实际已部署v1的未过期签名和逐major当前恢复资格；候选
 批次含安全v1不等于入口已更新。旧代次v1只要真实合格仍可复用，否则先部署安全v1，
 再激活v2，不自动重签、改写或假升级历史目录。实际v1文件SHA与替代另记激活收据。
+今后单独更新v1也不能豁免：官网及资源legacy activate均从固定位置读取并验签实际v2
+双通道，把其历史宿主要求加入返回图，再核将激活的真实v1推荐及API/目录准入。只有
+过去的v1投影不能证明历史host2不存在；伴随目录半对、身份丢失、范围收紧或临时漂移
+均阻断。历史可过期但身份仍受保护，不自动重签/改写旧v1，安全的新v1可先行修复。
 依赖HAP变化但新图仍合格时，可按同一JDK候选恢复，并另存当轮实际HAP闭包证明；
 旧证明不被改写或谎称仍新鲜。新图不合格则保持激活保护与明确原因。
 

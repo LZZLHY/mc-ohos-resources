@@ -6,6 +6,7 @@ import {createHash,generateKeyPairSync} from 'node:crypto';
 import {projectCatalogV2,derivePublishedReleaseClosure,fetchPublishedRuntimeHosts,validateTransitionV2,projectLegacyCatalogFromV2,assertLegacyReturnCoverage} from '../lib/catalog-v2.mjs';
 import {publishedHost} from './fixtures/published-host.mjs';
 import {assertIsolatedFixtureKey,signCatalog,verifyEnvelope} from '../tools/protocol.mjs';
+import {validateTransition as validateV1Transition} from '../lib/catalog-validation.mjs';
 const original=JSON.parse(fs.readFileSync(new URL('../catalog/source.json',import.meta.url),'utf8'));
 
 /** 每槽分别造不可变协议2预览与有来源/完整矩阵标记的协议1替代，绝不重标历史legacy原件。 */
@@ -113,7 +114,7 @@ test('只有真实stable宿主覆盖历史能力才解除义务；停止推荐�
   // 显式phone发布范围不能屏蔽实际desktop消费者，但两头不存在不制造占位要求。
   desktop[0].runtimePlanProtocol=0;
   assert.throws(()=>derivePublishedReleaseClosure(catalogs(qualified),[...caughtUp,...desktop],['sideload']),/STABLE_RETURN_PLAN_REQUIRED:desktop/);
-  desktop[0].runtimePlanProtocol=1;
+  desktop[0].runtimePlanProtocol=2;
   const scoped=derivePublishedReleaseClosure(catalogs(qualified),[...caughtUp,...desktop],['sideload']);
   assert.deepEqual(scoped.products,['sideload']);assert.deepEqual(scoped.returnProducts,['desktop']);
   assert(scoped.forward.every(r=>r.product==='sideload'));assert(scoped.returns.every(r=>r.product==='desktop'));
@@ -148,9 +149,51 @@ test('新v2激活核实际部署v1的逐槽返回资格，安全旧代次可用�
   }
 });
 
+test('同runtime历史API/目录准入不能提高后隐藏旧槽恢复；独立未来结构候选仍可检查',()=>{
+  const source=sourceFixture();for(const runtime of source.runtimes)runtime.minimumApi=26;
+  const before=catalogs(source),legacy=before.map(projectLegacyCatalogFromV2);
+  for(const [field,value] of [['minimumApi',27],['minimumCatalogProtocol',3]]){
+    const next=structuredClone(source);next.catalogRevision++;
+    for(const runtime of next.runtimes){runtime[field]=value;runtime.recommendations.stable.recommendationRevision++;runtime.recommendations.preview.recommendationRevision++;}
+    const after=catalogs(next); // 格式可表达未来候选，不以结构验证冒充当前客户端可安装。
+    for(let i=0;i<before.length;i++){
+      assert.throws(()=>validateTransitionV2(before[i],after[i]),/runtime admission .* tightened/);
+      const futureV1=structuredClone(legacy[i]);futureV1.catalogRevision++;futureV1.runtimes[0][field]=value;futureV1.runtimes[0].recommendationRevision++;
+      assert.throws(()=>validateV1Transition(legacy[i],futureV1),/runtime admission .* tightened/);
+    }
+    if(field==='minimumCatalogProtocol')assert.throws(()=>derivePublishedReleaseClosure(after,hosts()),/RUNTIME_CLIENT_ADMISSION_UNSUPPORTED/);
+    else assert.throws(()=>derivePublishedReleaseClosure(after,hosts(),['sideload'],before),/runtime admission minimumApi tightened/);
+  }
+  const proof=derivePublishedReleaseClosure(before,hosts()),narrowed=structuredClone(legacy);
+  narrowed[0].runtimes[0].minimumApi=27;
+  assert.throws(()=>assertLegacyReturnCoverage(narrowed,proof),/RUNTIME_CLIENT_ADMISSION_UNSUPPORTED/);
+  assert(proof.returns.every(graph=>graph.replacements.every(b=>b.admission.minimumApi===26)));
+});
+
+test('v1新激活保留验签v2宿主历史，不能用全局host1投影解除返回义务',()=>{
+  const modern=catalogs(sourceFixture()),legacy=modern.map(projectLegacyCatalogFromV2);
+  for(const catalog of legacy){catalog.catalogRevision++;for(const runtime of catalog.runtimes)runtime.recommendationRevision++;}
+  const proof=derivePublishedReleaseClosure(legacy,hosts(),['sideload'],modern);
+  assert.equal(proof.returns.length,2);assert.equal(proof.historyCatalogs.length,2);
+  assert.equal(assertLegacyReturnCoverage(legacy,proof).length,2);
+  for(const catalog of legacy)for(const runtime of catalog.runtimes)runtime.recommendedBuildId=catalog.builds.find(b=>b.runtimeId===runtime.id&&b.provenance.kind==='legacy').id;
+  assert.throws(()=>derivePublishedReleaseClosure(legacy,hosts(),['sideload'],modern),/STABLE_RETURN_JDK_NOT_QUALIFIED/);
+});
+
 test('旧stable plan0、有预览App且正向可跑2，仍必须禁止自动正式回退闭包',()=>{
   const current=hosts();current[0].runtimePlanProtocol=0;current[0].canReturn=true;
   assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),current),/STABLE_RETURN_PLAN_REQUIRED/);
+});
+
+test('旧plan1可识别但不授予新的跨宿主恢复资格；reader2两端真实声明才合格，未知3拒绝',()=>{
+  for(const index of [0,1]){
+    const current=hosts();current[index].runtimePlanProtocol=1;
+    assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),current),/STABLE_RETURN_PLAN_REQUIRED/);
+  }
+  const ordinary=hosts();ordinary[0].runtimeHostProtocols=[1,2];ordinary[0].runtimePlanProtocol=1;ordinary[1].runtimePlanProtocol=0;
+  assert.equal(derivePublishedReleaseClosure(catalogs(sourceFixture()),ordinary).returns.length,0);
+  const unknown=hosts();unknown[1].runtimePlanProtocol=3;
+  assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),unknown),/PUBLIC_HOST_PROTOCOL_INVALID/);
 });
 
 test('缺任意major合格替代、legacy凑数、撤回或协议不相交均不能放行',()=>{

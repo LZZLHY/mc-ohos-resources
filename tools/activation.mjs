@@ -3,12 +3,12 @@
  * 每次替换为原子单文件 rename；中断后阻止其它导出/签名，原参数重跑只补齐同一批字节。
  * 此处不声称两个静态 URL 同时切换，远端发布仍须提交同一 Git 批次并逐通道回读。
  */
-import {readFile,mkdir,open,rename,unlink} from 'node:fs/promises';
+import {readFile,mkdir,open,rename,unlink,lstat} from 'node:fs/promises';
 import {resolve,relative,isAbsolute,dirname} from 'node:path';
 import {readDeliveryClosure,validateDeliveryReceipt} from './delivery.mjs';
-import {sha256,verifyEnvelope,validateTransition} from './protocol.mjs';
+import {sha256,verifyEnvelope,validateTransition,MAX_CATALOG_BYTES,buildIdentity} from './protocol.mjs';
 import {projectCatalog} from './catalog.mjs';
-import {fetchPublishedRuntimeHosts,derivePublishedReleaseClosure,validateReleaseProducts} from '../lib/catalog-v2.mjs';
+import {fetchPublishedRuntimeHosts,derivePublishedReleaseClosure,validateReleaseProducts,assertLegacyReturnCoverage} from '../lib/catalog-v2.mjs';
 
 const markerPath=root=>resolve(root,'catalog/.activation-pending.json');
 const assert=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -61,10 +61,28 @@ export async function activateCatalog({root,candidateDir,receiptPath,transaction
     if(previous)validateTransition(verifyEnvelope(previous.toString(),keys,channel,Date.now(),true),catalog);
     prepared.push({channel,bytes,previous,path,catalog});
   }
+  // v1不表达每build宿主要求，不能用其提升后的host1图遗忘真实v2历史。固定同仓伴随目录
+  // 逐一验签（历史可过期但不可伪造/半对），不接受CLI任意历史文件或自报“没有2”声明。
+  const companions=[];
+  for(const channel of ['stable','preview']){
+    const path=resolve(root,'catalog/v2',channel+'.json'),bytes=await optionalRead(path);
+    if(bytes){const stat=await lstat(path);assert(stat.isFile()&&!stat.isSymbolicLink()&&bytes.length<=MAX_CATALOG_BYTES,'invalid companion catalog file');}
+    const catalog=bytes?verifyEnvelope(bytes.toString(),keys,channel,Date.now(),true):null;
+    if(catalog)assert(catalog.schemaVersion===2,'companion catalog namespace mismatch');
+    companions.push({channel,path,bytes,catalog});
+  }
+  assert(companions.every(c=>c.catalog)||companions.every(c=>!c.catalog),'companion v2 namespace is incomplete');
+  const companionCatalogs=companions.filter(c=>c.catalog).map(c=>c.catalog);
+  for(const companion of companionCatalogs)for(const old of companion.builds){
+    const fresh=prepared.find(c=>c.channel===companion.channel).catalog.builds.find(b=>b.id===old.id);
+    assert(fresh&&buildIdentity(old)===buildIdentity(fresh)&&(old.status!=='withdrawn'||fresh.status==='withdrawn'),'companion build identity removed, changed or revived');
+  }
   // 签名/旧资产收据不代表依赖永远有效：真正激活前从固定官网重读实际公开HAP并派生返回图。
-  const releaseClosure=derivePublishedReleaseClosure(prepared.map(item=>item.catalog),await fetchPublishedRuntimeHosts(fetchImpl,products),products);
+  const releaseClosure=derivePublishedReleaseClosure(prepared.map(item=>item.catalog),await fetchPublishedRuntimeHosts(fetchImpl,products),products,companionCatalogs);
+  const legacyReturnCoverage=assertLegacyReturnCoverage(prepared.map(item=>item.catalog),releaseClosure);
   const releaseCheck={schemaVersion:1,checkedAt:new Date().toISOString(),sourceSha256:closure.sourceSha256,
-    catalogFiles:Object.fromEntries(prepared.map(item=>[item.channel,sha256(item.bytes)])),releaseClosure};
+    catalogFiles:Object.fromEntries(prepared.map(item=>[item.channel,sha256(item.bytes)])),releaseClosure,legacyReturnCoverage,
+    companionCatalogFiles:Object.fromEntries(companions.filter(c=>c.bytes).map(c=>[c.channel,sha256(c.bytes)]))};
   const releaseBytes=Buffer.from(JSON.stringify(releaseCheck,null,2)+'\n'),releaseHash=sha256(releaseBytes);
   // 所有签名、资产、来源和代次验证先完成，再建立日志和写者标记。
   if(!journal){
@@ -87,6 +105,7 @@ export async function activateCatalog({root,candidateDir,receiptPath,transaction
   const checkedJournal=Buffer.from(JSON.stringify(journal,null,2)+'\n');
   await replaceFile(journalPath,checkedJournal,sha256(checkedJournal));
   assert((await readDeliveryClosure(root)).closureSha256===closure.closureSha256,'delivery inputs changed during activation preflight');
+  for(const companion of companions){const current=await optionalRead(companion.path);assert(current===null?companion.bytes===null:companion.bytes&&current.equals(companion.bytes),'companion catalogs changed during activation preflight');}
   if(!markerRaw)await durableWrite(markerPath(root),JSON.stringify({schemaVersion:1,root,transactionDir,closureSha256:closure.closureSha256})+'\n');
   await mkdir(resolve(root,'catalog/v1'),{recursive:true});
   for(const item of prepared){

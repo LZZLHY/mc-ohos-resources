@@ -15,6 +15,7 @@ import {readSourceZip,verifySourceArchive,crc32} from '../tools/source-archive.m
 import {remoteIdentity,validateExistingAssets} from '../tools/publish.mjs';
 import {activateCatalog,assertNoPendingActivation} from '../tools/activation.mjs';
 import {publishedHost} from './fixtures/published-host.mjs';
+import {projectCatalogV2} from '../lib/catalog-v2.mjs';
 const publicHostFetch=async url=>Response.json(publishedHost({product:new URL(url).searchParams.get('product'),channel:new URL(url).searchParams.get('channel')}));
 
 const sourceTemplate=JSON.parse(readFileSync(new URL('../catalog/source.json',import.meta.url)));
@@ -201,7 +202,7 @@ test('interruption after first channel is gated and idempotently resumes exact b
   const receipt=resolve(task,'receipt.json');await writeFile(receipt,raw(verification(f.closure())));
   const blockedHosts=async url=>{
     const channel=new URL(url).searchParams.get('channel');
-    return Response.json(publishedHost({product:new URL(url).searchParams.get('product'),channel,runtimeHostProtocols:channel==='stable'?[1]:[1,2],runtimePlanProtocol:channel==='stable'?0:1}));
+    return Response.json(publishedHost({product:new URL(url).searchParams.get('product'),channel,runtimeHostProtocols:channel==='stable'?[1]:[1,2],runtimePlanProtocol:channel==='stable'?0:2}));
   };
   await assert.rejects(activateCatalog({root,candidateDir:candidate,receiptPath:receipt,transactionDir:transaction,fetchImpl:blockedHosts}),/STABLE_RETURN_PLAN_REQUIRED/);
   await assertNoPendingActivation(root);
@@ -218,4 +219,46 @@ test('interruption after first channel is gated and idempotently resumes exact b
   await assertNoPendingActivation(root);
   for(const channel of ['stable','preview'])assert.deepEqual(await readFile(resolve(root,'catalog/v1',channel+'.json')),await readFile(resolve(candidate,channel+'.json')));
   assert.equal(JSON.parse(await readFile(resolve(transaction,'transaction.json'))).state,'complete');
+});
+
+test('legacy实际激活携带v2历史并核真实v1恢复资格，API/目录退休或legacy拆保障均阻断',async()=>{
+  const base=resolve(process.env.AMCL_TEST_TMP??tmpdir());await mkdir(base,{recursive:true});
+  const task=await mkdtemp(resolve(base,'delivery-v1-history-')),root=resolve(task,'repository'),candidate=resolve(task,'candidate'),transaction=resolve(task,'transaction');
+  await mkdir(resolve(root,'catalog/v1'),{recursive:true});await mkdir(resolve(root,'catalog/v2'));await mkdir(resolve(root,'provenance'));await mkdir(candidate);
+  const f=fixture(),runtime=f.source.runtimes[0],pair=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+  for(const [suffix,bytes] of [['legacy1','old host1'],['history2','old host2']]){
+    const build=structuredClone(f.build);build.id+='-'+suffix;build.legacyTags=[];build.provenance.kind='legacy';build.validationLevel='legacy-compatible';
+    build.archive={type:'zip',fileName:build.id+'.zip',sizeBytes:bytes.length,sha256:sha256(bytes)};
+    build.downloads=[{sourceId:'github',transport:'single-file',url:pool+build.archive.fileName}];f.source.builds.push(build);
+  }
+  const keys={keys:[{kid:'history-test',algorithm:'ES256',spki:pair.publicKey.export({type:'spki',format:'der'}).toString('base64')}]};
+  await writeFile(resolve(root,'catalog/trusted-keys.json'),raw(keys));
+  const seal=c=>raw(signCatalog(c,pair.privateKey,'history-test')),modern=structuredClone(f.source);modern.schemaVersion=2;
+  for(const build of modern.builds)build.requiredHostProtocol=build.id.endsWith('history2')?2:1;
+  for(const r of modern.runtimes){delete r.loaderProtocol;for(const channel of ['stable','preview'])r.recommendations[channel]={recommendationRevision:1,recommendedBuildIds:channel==='preview'?[f.build.id+'-history2',f.build.id]:[f.build.id]};}
+  const old={};for(const channel of ['stable','preview']){
+    old[channel]=seal(projectCatalog(f.source,channel));await writeFile(resolve(root,'catalog/v1',channel+'.json'),old[channel]);
+    await writeFile(resolve(root,'catalog/v2',channel+'.json'),seal(projectCatalogV2(modern,channel)));
+  }
+  f.source.catalogRevision++;for(const channel of ['stable','preview'])runtime.recommendations[channel].recommendationRevision++;
+  await writeFile(resolve(root,'provenance/build-inputs.json'),raw(f.index));await writeFile(resolve(root,'provenance',f.build.id+'.json'),f.receiptRaw);
+  const receipt=resolve(task,'receipt.json');
+  async function prepare(){
+    await writeFile(resolve(root,'catalog/source.json'),raw(f.source));await writeFile(receipt,raw(verification(f.closure())));
+    for(const channel of ['stable','preview'])await writeFile(resolve(candidate,channel+'.json'),seal(projectCatalog(f.source,channel)));
+  }
+  const hosts=async url=>{const query=new URL(url).searchParams;return query.get('product')==='desktop'?new Response('',{status:404}):Response.json(publishedHost({channel:query.get('channel'),runtimeHostProtocols:query.get('channel')==='stable'?[1]:[1,2]}));};
+  for(const [field,value] of [['minimumApi',runtime.minimumApi+1],['minimumCatalogProtocol',3]]){
+    const previous=runtime[field];runtime[field]=value;await prepare();
+    await assert.rejects(activateCatalog({root,candidateDir:candidate,receiptPath:receipt,transactionDir:transaction,fetchImpl:hosts}),/runtime admission .* tightened/);runtime[field]=previous;
+  }
+  for(const channel of ['stable','preview'])runtime.recommendations[channel].recommendedBuildId=f.build.id+'-legacy1';await prepare();
+  await assert.rejects(activateCatalog({root,candidateDir:candidate,receiptPath:receipt,transactionDir:transaction,fetchImpl:hosts}),/STABLE_RETURN_JDK_NOT_QUALIFIED/);
+  await assertNoPendingActivation(root);await assert.rejects(readFile(resolve(transaction,'transaction.json')),e=>e.code==='ENOENT');
+  for(const channel of ['stable','preview'])assert.deepEqual(await readFile(resolve(root,'catalog/v1',channel+'.json')),old[channel]);
+  for(const channel of ['stable','preview'])runtime.recommendations[channel].recommendedBuildId=f.build.id;await prepare();
+  const journal=await activateCatalog({root,candidateDir:candidate,receiptPath:receipt,transactionDir:transaction,fetchImpl:hosts});
+  const check=JSON.parse(await readFile(resolve(transaction,journal.releaseClosureChecks[0].file),'utf8'));
+  assert.equal(check.releaseClosure.returns.length,2);assert.equal(check.legacyReturnCoverage.length,2);
+  assert.equal(Object.keys(check.companionCatalogFiles).length,2);
 });

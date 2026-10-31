@@ -216,25 +216,38 @@ R12的实际来源ZIP、Fontconfig/FreeType、音频、MIDI、Ports、native-tem
 
 ## 发布资格中的稳定返回闭包
 
-本批App产品用 `--products sideload` 或显式 `--products sideload,desktop` 指定，默认仅
-sideload，也允许desktop-only。不会因为历史存在desktop头就扩大本批，不造缺失产品占位。
-纳入的产品分别读取固定官网runtime-host接口，要求真实公开GitHub HAP的文件名、完整
+本批App正向准入产品用 `--products sideload` 或显式 `--products sideload,desktop` 指定，
+默认仅sideload，也允许desktop-only；不造缺失产品占位，不强迫未纳入产品发布新协议App。
+JDK签名目录本身跨产品共用，因此固定官网runtime-host接口始终读取两个已知产品：
+显式products只限制本批forward，不能排除另一实际公开preview消费者的历史返回义务。
+双头404的产品自然忽略；只有stable且无preview的产品不凭空产生新协议返回要求。
+官网事实要求真实公开GitHub HAP的文件名、完整
 SHA/大小、publicationId、源码修订、设备/API/ABI、宿主集合和恢复协议；不接受developer、
-staged、其它产品的HAP或表单“可返回”声明。未纳入产品保持既有v1/按真实宿主选择的
-兼容投影，不承诺该产品获得新宿主能力。
+staged、其它产品的HAP或表单“可返回”声明。返回证明用returnProducts单列实际消费者，
+不承诺未纳入正向产品获得新宿主能力，也不拿手机事实代替desktop。
 
 结构 `check` 只说明候选格式，不能称公开发行资格通过。生产 `generate` 在读私钥前
 验证来源/全量原件收据，并派生正向与返回两图：每个推荐先有本批产品的公开App；预览
 引入stable未支持的宿主时，两端须支持恢复协议1，stable不能降低安装code或设备/API
-范围。当前JDK通道每个受支持major都须有同时被两端宿主支持、未撤回、source-build且
+范围。只要两目录保留历史build要求仍被公开preview支持而stable不支持，即使该build
+已退出推荐或已撤回，也可能仍装在用户槽中，返回义务持续到真实stable宿主覆盖为止。
+仅登记且无公开preview支持的未来协议候选不会据此要求发布未来App。
+App订阅与JDK选择通道独立：用户可先装preview2，再只切JDK通道stable，因此两份JDK
+通道每个受支持major都须有同时被两端宿主支持、未撤回、source-build且
 device-matrix-tested的推荐替代，绑定精确build/归档SHA/大小/来源收据。legacy例外只能
-保留历史下载，不能凑恢复资格。普通不降低宿主能力的维护不强迫旧stable升级恢复协议。
+保留历史下载，不能凑恢复资格。新批次还核实际v1投影选择的首个协议1推荐同样合格，
+仅在legacy后面追加安全fallback会阻断，须明确调整推荐顺序而不能伪造矩阵级别。
+证明列出触发义务的历史build状态/SHA及每通道精确替代。普通无历史能力差异的维护
+不强迫旧stable升级恢复协议。
 缺桥接stable或任何安全替代即阻断签名，不机械发布当前旧稳定JDK8作为“回退”。
 
 新projection-receipt为schemaVersion2，绑定本批产品、生成时闭包、精确源/原件闭包摘要
 和四份签名文件。源在异步校验期间变化会拒绝，不会给旧payload写新source摘要。
 receipt只作对账索引，权威仍是固定公钥JWS及真正激活时从官网重算的公开HAP/返回图。
 官网v2激活必须带该批收据；legacy activate也重新核公开依赖，不因旧格式绕开返回门。
+有返回义务的新v2官网激活还核实际已部署v1的未过期签名和逐major当前恢复资格；候选
+批次含安全v1不等于入口已更新。旧代次v1只要真实合格仍可复用，否则先部署安全v1，
+再激活v2，不自动重签、改写或假升级历史目录。实际v1文件SHA与替代另记激活收据。
 依赖HAP变化但新图仍合格时，可按同一JDK候选恢复，并另存当轮实际HAP闭包证明；
 旧证明不被改写或谎称仍新鲜。新图不合格则保持激活保护与明确原因。
 

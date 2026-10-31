@@ -9,3 +9,8 @@ export function publishedHost({product='sideload',channel='stable',versionName=c
     sourceRevision:'b'.repeat(40),websiteUrl:'https://amcl.lovedhy.cn/api/packages/files/'+sha256+'/'+name,
     minApi,abi:'arm64-v8a',deviceTypes,runtimeHostProtocols,runtimePlanProtocol};
 }
+/** 隔离发布账从空库起记录完整历史；与生产固定facts接口同形，不是可供生产CLI读取的证明。 */
+export function publishedHostFacts(heads,publications=heads){
+  return{schema:1,products:['sideload','desktop'].map(product=>({schema:1,product,coverage:'complete',
+    heads:heads.filter(h=>h.product===product),publications:publications.filter(h=>h.product===product)}))};
+}

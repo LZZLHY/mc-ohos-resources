@@ -3,8 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash,generateKeyPairSync} from 'node:crypto';
-import {projectCatalogV2,derivePublishedReleaseClosure,fetchPublishedRuntimeHosts,validateTransitionV2,projectLegacyCatalogFromV2,assertLegacyReturnCoverage} from '../lib/catalog-v2.mjs';
-import {publishedHost} from './fixtures/published-host.mjs';
+import {projectCatalogV2,derivePublishedReleaseClosure as deriveContract,fetchPublishedRuntimeHosts,validateTransitionV2,projectLegacyCatalogFromV2,assertLegacyReturnCoverage} from '../lib/catalog-v2.mjs';
+import {publishedHost,publishedHostFacts} from './fixtures/published-host.mjs';
 import {assertIsolatedFixtureKey,signCatalog,verifyEnvelope} from '../tools/protocol.mjs';
 import {validateTransition as validateV1Transition} from '../lib/catalog-validation.mjs';
 const original=JSON.parse(fs.readFileSync(new URL('../catalog/source.json',import.meta.url),'utf8'));
@@ -33,6 +33,8 @@ function sourceFixture(){
 }
 const catalogs=source=>['stable','preview'].map(channel=>projectCatalogV2(source,channel));
 const hosts=()=>[publishedHost({runtimeHostProtocols:[1]}),publishedHost({channel:'preview'})];
+// 旧小用例省略“过去不同的头”时，显式把隔离当前样本登记为从空库完整记录的发布账。
+const derivePublishedReleaseClosure=(catalogs,heads,products,history)=>deriveContract(catalogs,Array.isArray(heads)?publishedHostFacts(heads):heads,products,history);
 
 test('完整闭包绑定真实形状的去返HAP及每槽精确原件，而不是自报可返回布尔',()=>{
   const source=sourceFixture(),proof=derivePublishedReleaseClosure(catalogs(source),hosts());
@@ -180,6 +182,43 @@ test('v1新激活保留验签v2宿主历史，不能用全局host1投影解除�
   assert.throws(()=>derivePublishedReleaseClosure(legacy,hosts(),['sideload'],modern),/STABLE_RETURN_JDK_NOT_QUALIFIED/);
 });
 
+test('新formal把preview头降回1不能抹历史公开2；两namespace仍需返回，真stable覆盖才结束',()=>{
+  const original=sourceFixture(),retired=retireHost2(original,{withdrawn:true});
+  const old=hosts(),current=['stable','preview'].map(channel=>publishedHost({channel,versionName:'2.1.0',versionCode:2000001,runtimeHostProtocols:[1]}));
+  const facts=publishedHostFacts(current,[...old,...current]),proof=deriveContract(catalogs(retired),facts);
+  assert.equal(proof.returns.length,2);assert(proof.returns.every(r=>r.fromHost.endsWith(old[1].publicationId)));
+  assert.equal(assertLegacyReturnCoverage(catalogs(retired).map(projectLegacyCatalogFromV2),proof).length,2);
+  const unsafe=retireHost2(retired,{channel:'stable',qualified:false});
+  for(const runtime of unsafe.runtimes)runtime.recommendations.preview.recommendedBuildIds=[unsafe.builds.find(b=>b.runtimeId===runtime.id&&b.provenance.kind==='legacy').id];
+  assert.throws(()=>deriveContract(catalogs(unsafe),facts),/STABLE_RETURN_JDK_NOT_QUALIFIED/);
+  assert.throws(()=>deriveContract(catalogs(unsafe).map(projectLegacyCatalogFromV2),facts,['sideload'],catalogs(original)),/STABLE_RETURN_JDK_NOT_QUALIFIED/);
+  const covered=structuredClone(current);covered[0].runtimeHostProtocols=[1,2];
+  assert.equal(deriveContract(catalogs(unsafe),publishedHostFacts(covered,[...old,...covered])).returns.length,0);
+});
+
+test('历史HAP的API/设备和code cohort不随最新头升门槛消失；仅登记未来3没有公开事实不生义务',()=>{
+  const source=retireHost2(sourceFixture(),{withdrawn:true}),old=hosts();
+  for(const mutation of [h=>{h.minApi=27;},h=>{h.deviceTypes=['2in1'];}]){
+    const current=['stable','preview'].map(channel=>publishedHost({channel,versionName:'2.1.0',versionCode:2000001}));
+    for(const head of current)mutation(head);
+    assert.throws(()=>deriveContract(catalogs(source),publishedHostFacts(current,[...old,...current])),/STABLE_RETURN_HAP_INCOMPATIBLE/);
+  }
+  const noPublic3=structuredClone(source);for(const build of noPublic3.builds)if(build.requiredHostProtocol===2)build.requiredHostProtocol=3;
+  const only1=['stable','preview'].map(channel=>publishedHost({channel,versionName:'2.1.0',versionCode:2000001,runtimeHostProtocols:[1]}));
+  assert.equal(deriveContract(catalogs(noPublic3),publishedHostFacts(only1)).returns.length,0);
+});
+
+test('只有latest数组、历史覆盖未知、当前头无历史绑定、404或截断均不构成完整生产事实',async()=>{
+  assert.throws(()=>deriveContract(catalogs(sourceFixture()),hosts()),/PUBLIC_HOST_HISTORY_REQUIRED/);
+  const incomplete=publishedHostFacts(hosts());incomplete.products[1].coverage='legacy-unknown';
+  assert.throws(()=>deriveContract(catalogs(sourceFixture()),incomplete),/PUBLIC_HOST_HISTORY_INCOMPLETE:desktop/);
+  const unbound=publishedHostFacts(hosts(),[]);
+  assert.throws(()=>deriveContract(catalogs(sourceFixture()),unbound),/HEAD_HISTORY_MISMATCH/);
+  await assert.rejects(fetchPublishedRuntimeHosts(async()=>new Response('',{status:404})),/PUBLIC_HOST_HTTP:404/);
+  const tooMany=publishedHostFacts(hosts());tooMany.products[0].publications=Array.from({length:257},()=>hosts()[0]);
+  assert.throws(()=>deriveContract(catalogs(sourceFixture()),tooMany),/PUBLIC_HOST_HISTORY_LIMIT/);
+});
+
 test('旧stable plan0、有预览App且正向可跑2，仍必须禁止自动正式回退闭包',()=>{
   const current=hosts();current[0].runtimePlanProtocol=0;current[0].canReturn=true;
   assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),current),/STABLE_RETURN_PLAN_REQUIRED/);
@@ -232,15 +271,15 @@ test('发布事实拒绝developer/假原件/重复头及有界固定官网网络
   for(const change of [h=>{h.source='website-upload';},h=>{h.publicationId='ready';},h=>{h.sha256=['a'.repeat(64)];},h=>{h.runtimePlanProtocol=null;}]){
     const current=hosts();change(current[0]);assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),current),/PUBLIC_HOST_/);
   }
-  assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),[...hosts(),hosts()[0]]),/AMBIGUOUS/);
+  assert.throws(()=>derivePublishedReleaseClosure(catalogs(sourceFixture()),[...hosts(),hosts()[0]]),/AMBIGUOUS|HISTORY_LIMIT/);
   const seen=[];
   const facts=await fetchPublishedRuntimeHosts(async(url,options)=>{
-    seen.push(url);assert.equal(options.redirect,'error');assert(url.startsWith('https://amcl.lovedhy.cn/api/packages/runtime-host?'));
+    seen.push(url);assert.equal(options.redirect,'error');assert(url.startsWith('https://amcl.lovedhy.cn/api/packages/runtime-host-facts?'));
     const query=new URL(url).searchParams;
-    return query.get('product')==='desktop'?new Response('',{status:404}):Response.json(publishedHost({channel:query.get('channel')}));
+    return Response.json(publishedHostFacts(hosts()).products.find(p=>p.product===query.get('product')));
   },['sideload','desktop']);
-  assert.equal(facts.length,2);assert.equal(seen.length,4);
-  await assert.rejects(fetchPublishedRuntimeHosts(async()=>new Response('x'.repeat(65537))),/TOO_LARGE/);
+  assert.equal(facts.products[1].heads.length,2);assert.equal(seen.length,2);
+  await assert.rejects(fetchPublishedRuntimeHosts(async()=>new Response('x'.repeat(524289))),/TOO_LARGE/);
 });
 
 test('fixture不能借改kid或自选keys文件使用生产SPKI',()=>{

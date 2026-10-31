@@ -218,9 +218,10 @@ R12的实际来源ZIP、Fontconfig/FreeType、音频、MIDI、Ports、native-tem
 
 本批App正向准入产品用 `--products sideload` 或显式 `--products sideload,desktop` 指定，
 默认仅sideload，也允许desktop-only；不造缺失产品占位，不强迫未纳入产品发布新协议App。
-JDK签名目录本身跨产品共用，因此固定官网runtime-host接口始终读取两个已知产品：
+JDK签名目录本身跨产品共用，因此固定官网runtime-host-facts接口始终读取两个已知产品：
 显式products只限制本批forward，不能排除另一实际公开preview消费者的历史返回义务。
-双头404的产品自然忽略；只有stable且无preview的产品不凭空产生新协议返回要求。
+从空库完整记录且历史/当前均为空的产品自然忽略，不造占位。历史端点404不代表从未发布，
+会阻断；接口须完整返回当前可用头及只追加的官方publication/HAP审计快照。
 官网事实要求真实公开GitHub HAP的文件名、完整
 SHA/大小、publicationId、源码修订、设备/API/ABI、宿主集合和恢复协议；不接受developer、
 staged、其它产品的HAP或表单“可返回”声明。返回证明用returnProducts单列实际消费者，
@@ -243,6 +244,15 @@ device-matrix-tested的推荐替代，绑定精确build/归档SHA/大小/来源�
 reader/交接契约；与宿主ABI[1,2]和minimumCatalogProtocol<=2分别计数。旧plan1仍按
 真实入包值识别，但不授予本轮新跨宿主返回资格；无新JDK副作用的普通路径可保持0/1，
 历史已在途plan1由客户端原binding安全恢复，不改写旧发行审计或假设旧reader已升级。
+最新preview头收敛成host1、提高API或缩窄设备不会卸载旧HAP/JDK用户。返回按每条曾经
+真实公开的官方HAP与保留JDK历史交集持续派生，检查当前stable覆盖原code/API/设备/ABI；
+缺宿主协议时两JDK通道继续留合格替代，直到当前stable真正覆盖。历史不授予当前forward
+可下载资格，staged/developer不入账，blob丢失或退役不删除发布事实。仅登记未来3且没有
+真实官方HAP历史支持，不产生假义务。
+生产闭包不再接受只有latest数组：当前头必须绑定同批历史快照。新库从首笔发布起记账；
+旧库无法恢复已被覆盖头，coverage=legacy-unknown明确阻断未来生产生成/激活，不能用
+管理员布尔、清历史或假旧用户已迁移解决。迁移所需原始证据及离线复核方案见官网
+deploy/RUNTIME-HOST-HISTORY-MIGRATION.md；生产回填不属于本轮代码授权。
 同runtime ID保存历史可安装范围：minimumApi或minimumCatalogProtocol不能随加代次
 提高，不能让API26旧槽因整体API27门槛连安全替代也看不到。平台身份保持不可变；需要
 新平台/新目录协议时须先设计明确演进，不能用全局runtime字段退休已安装用户。

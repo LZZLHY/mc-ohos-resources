@@ -14,9 +14,10 @@ import {MIDI_PATCH} from '../tools/runtime-midi.mjs';
 import {readSourceZip,verifySourceArchive,crc32} from '../tools/source-archive.mjs';
 import {remoteIdentity,validateExistingAssets} from '../tools/publish.mjs';
 import {activateCatalog,assertNoPendingActivation} from '../tools/activation.mjs';
-import {publishedHost} from './fixtures/published-host.mjs';
+import {publishedHost,publishedHostFacts} from './fixtures/published-host.mjs';
 import {projectCatalogV2} from '../lib/catalog-v2.mjs';
-const publicHostFetch=async url=>Response.json(publishedHost({product:new URL(url).searchParams.get('product'),channel:new URL(url).searchParams.get('channel')}));
+const publicFacts=(product,make)=>publishedHostFacts(['stable','preview'].map(channel=>make(channel))).products.find(p=>p.product===product);
+const publicHostFetch=async url=>{const product=new URL(url).searchParams.get('product');return Response.json(publicFacts(product,channel=>publishedHost({product,channel})));};
 
 const sourceTemplate=JSON.parse(readFileSync(new URL('../catalog/source.json',import.meta.url)));
 const raw=value=>Buffer.from(JSON.stringify(value,null,2)+'\n');
@@ -201,8 +202,8 @@ test('interruption after first channel is gated and idempotently resumes exact b
   for(const channel of ['stable','preview'])await writeFile(resolve(candidate,channel+'.json'),raw(signCatalog(projectCatalog(f.source,channel),pair.privateKey,'test')));
   const receipt=resolve(task,'receipt.json');await writeFile(receipt,raw(verification(f.closure())));
   const blockedHosts=async url=>{
-    const channel=new URL(url).searchParams.get('channel');
-    return Response.json(publishedHost({product:new URL(url).searchParams.get('product'),channel,runtimeHostProtocols:channel==='stable'?[1]:[1,2],runtimePlanProtocol:channel==='stable'?0:2}));
+    const product=new URL(url).searchParams.get('product');
+    return Response.json(publicFacts(product,channel=>publishedHost({product,channel,runtimeHostProtocols:channel==='stable'?[1]:[1,2],runtimePlanProtocol:channel==='stable'?0:2})));
   };
   await assert.rejects(activateCatalog({root,candidateDir:candidate,receiptPath:receipt,transactionDir:transaction,fetchImpl:blockedHosts}),/STABLE_RETURN_PLAN_REQUIRED/);
   await assertNoPendingActivation(root);
@@ -213,7 +214,7 @@ test('interruption after first channel is gated and idempotently resumes exact b
   // 当前 preview 仍是旧有效签名；不是被截断的文件。恢复使用同一已验新批次补齐。
   const oldPayload=JSON.parse((await readFile(resolve(root,'catalog/v1/preview.json'))).toString()).payload;
   assert.equal(oldPayload,JSON.parse(oldPreview).payload);
-  const newerHosts=async url=>Response.json(publishedHost({product:new URL(url).searchParams.get('product'),channel:new URL(url).searchParams.get('channel'),versionName:'2.0.1',versionCode:2000001}));
+  const newerHosts=async url=>{const product=new URL(url).searchParams.get('product');return Response.json(publicFacts(product,channel=>publishedHost({product,channel,versionName:'2.0.1',versionCode:2000001})));};
   const completed=await activateCatalog({root,candidateDir:candidate,receiptPath:receipt,transactionDir:transaction,fetchImpl:newerHosts});
   assert.equal(completed.releaseClosureChecks.length,2,'合格新HAP允许恢复同一签名候选，旧/新依赖证明分别留存');
   await assertNoPendingActivation(root);
@@ -247,7 +248,7 @@ test('legacy实际激活携带v2历史并核真实v1恢复资格，API/目录退
     await writeFile(resolve(root,'catalog/source.json'),raw(f.source));await writeFile(receipt,raw(verification(f.closure())));
     for(const channel of ['stable','preview'])await writeFile(resolve(candidate,channel+'.json'),seal(projectCatalog(f.source,channel)));
   }
-  const hosts=async url=>{const query=new URL(url).searchParams;return query.get('product')==='desktop'?new Response('',{status:404}):Response.json(publishedHost({channel:query.get('channel'),runtimeHostProtocols:query.get('channel')==='stable'?[1]:[1,2]}));};
+  const hosts=async url=>{const product=new URL(url).searchParams.get('product');return Response.json(product==='desktop'?publishedHostFacts([]).products.find(p=>p.product===product):publicFacts(product,channel=>publishedHost({channel,runtimeHostProtocols:channel==='stable'?[1]:[1,2]})));};
   for(const [field,value] of [['minimumApi',runtime.minimumApi+1],['minimumCatalogProtocol',3]]){
     const previous=runtime[field];runtime[field]=value;await prepare();
     await assert.rejects(activateCatalog({root,candidateDir:candidate,receiptPath:receipt,transactionDir:transaction,fetchImpl:hosts}),/runtime admission .* tightened/);runtime[field]=previous;

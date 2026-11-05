@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash,generateKeyPairSync} from 'node:crypto';
-import {projectCatalogV2,derivePublishedReleaseClosure as deriveContract,fetchPublishedRuntimeHosts,validateTransitionV2,projectLegacyCatalogFromV2,assertLegacyReturnCoverage} from '../lib/catalog-v2.mjs';
+import {projectCatalogV2,derivePublishedReleaseClosure as deriveContract,fetchPublishedRuntimeHosts,validateTransitionV2,projectLegacyCatalogFromV2,assertLegacyReturnCoverage,normalizePublishedHost,normalizePublishedHostFacts,normalizeOfficialDownloadExposure} from '../lib/catalog-v2.mjs';
 import {publishedHost,publishedHostFacts,officialExposure} from './fixtures/published-host.mjs';
 import {assertIsolatedFixtureKey,signCatalog,verifyEnvelope} from '../tools/protocol.mjs';
 import {validateTransition as validateV1Transition} from '../lib/catalog-validation.mjs';
@@ -310,4 +310,31 @@ test('fixture不能借改kid或自选keys文件使用生产SPKI',()=>{
   const pinned={keys:[{kid:'production-original',spki:pair.publicKey.export({type:'spki',format:'der'}).toString('base64')}]};
   assert.throws(()=>assertIsolatedFixtureKey(pair.privateKey,pinned),/FIXTURE_KEY_IS_PRODUCTION/);
   assert.doesNotThrow(()=>assertIsolatedFixtureKey(other.privateKey,pinned));
+});
+
+test('精确1.0.5原件保留缺失源码与旧发布ID，只能进入历史和曝光，不能作为当前头',()=>{
+  const old=publishedHost({versionName:'1.0.5',versionCode:1000678,runtimeHostProtocols:[1],runtimePlanProtocol:0});
+  Object.assign(old,{name:'amcl-v1.0.5-unsigned.hap',sourceRevision:'',sizeBytes:77157706,
+    sha256:'15e1a1f5d3e3890837a21fb6b579c6b731e3e26fbf0b797572188888736c125f',
+    publicationId:'legacy-v1.0.5-sideload-1000678'});
+  old.websiteUrl='https://amcl.lovedhy.cn/api/packages/files/'+old.sha256+'/'+old.name;
+  const current=publishedHost();
+  const exposure=officialExposure(old);
+  const history=publishedHostFacts([current],[old,current],[exposure]);
+  const normalized=normalizePublishedHostFacts(history);
+  assert.equal(normalized.products[1].publications[0].sourceRevision,'');
+  assert.equal(normalized.products[1].publications[0].publicationId,old.publicationId);
+  assert.equal(normalizeOfficialDownloadExposure(exposure).name,old.name);
+  assert.throws(()=>normalizePublishedHost(old),/PUBLIC_HOST_/);
+  assert.throws(()=>normalizePublishedHostFacts(publishedHostFacts([old])),/PUBLIC_HOST_/);
+  // 旧原件只增加已装用户的覆盖义务。真正的新版正式头覆盖1/2后无需切槽回退。
+  assert.equal(deriveContract(catalogs(sourceFixture()),history).returns.length,0);
+  for(const changes of [
+    {sha256:'0'.repeat(64)},{sizeBytes:77157707},{sourceRevision:'a'.repeat(40)},
+    {runtimeHostProtocols:[1,2]},{runtimePlanProtocol:2},{deviceTypes:['phone']},
+    {minApi:21},{publicationId:'legacy-v1.0.6-sideload-1000910'},
+  ]){
+    const forged={...old,...changes};
+    assert.throws(()=>normalizePublishedHost(forged,'sideload','stable',true),/PUBLIC_HOST_/);
+  }
 });

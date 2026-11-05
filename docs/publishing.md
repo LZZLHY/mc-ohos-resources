@@ -216,6 +216,14 @@ R12的实际来源ZIP、Fontconfig/FreeType、音频、MIDI、Ports、native-tem
 
 ## 发布资格中的稳定返回闭包
 
+历史账允许精确的 1.0.5 通用包原件，身份为已公开的
+`15e1a1f5d3e3890837a21fb6b579c6b731e3e26fbf0b797572188888736c125f`、
+77,157,706 字节。原件未声明源码提交，历史继续保存空值，宿主协议为 1、恢复读取为 0。
+该例外固定旧文件名、版本、API、ABI 和设备范围，读取真实旧
+`legacy-v1.0.5-sideload-1000678` 指针，不补造 publicationId。只有历史行和官方原件
+曝光允许此身份，当前正向头仍须满足完整现代原件规则。其是否曾公开、完整历史是否
+齐全仍须由官网的独立证据审计和迁移证明，匹配此 SHA 本身不解除历史缺口。
+
 本批App正向准入产品用 `--products sideload` 或显式 `--products sideload,desktop` 指定，
 默认仅sideload，也允许desktop-only；不造缺失产品占位，不强迫未纳入产品发布新协议App。
 JDK签名目录本身跨产品共用，因此固定官网runtime-host-facts接口始终读取两个已知产品：

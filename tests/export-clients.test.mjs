@@ -50,6 +50,7 @@ test('export freezes committed Git blobs, canonical LF and exact source identity
       const manifest=JSON.parse(fs.readFileSync(path.join(directory,'source.json'),'utf8'));
       assert.equal(manifest.schemaVersion,1);assert.equal(manifest.sourceRepository,'https://github.com/LZZLHY/mc-ohos-resources');
       assert.equal(manifest.sourceCommit,commit);assert.equal(manifest.hashBasis,'git-blob-lf');assert.deepEqual(Object.keys(manifest.files).sort(),names.slice().sort());
+      assert.equal(manifest.trustedKeys.sha256,digest(fs.readFileSync(path.join(directory,'catalog/trusted-keys.json'))));
       for(const name of names){
         const blob=git('cat-file','blob',commit+':'+name),copied=fs.readFileSync(path.join(directory,name));
         assert.deepEqual(copied,blob,name);assert.equal(manifest.files[name],digest(blob),name);assert(!copied.includes(Buffer.from('\r\n')),name);

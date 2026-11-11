@@ -60,7 +60,11 @@ const {verifyEnvelope}=await import('./protocol.mjs');
 const {assertNoPendingActivation}=await import('./activation.mjs');
 const catalogDir=resolve(option('catalog-dir')||resolve(root,'catalog/v1'));
 await assertNoPendingActivation(root);
-const keysBytes=await readFile(resolve(root,'catalog/trusted-keys.json'));
+// 公钥也是独立可部署的信任输入，保留Git原字节，不把工作副本或待导出目录当新信任根。
+const keyPath='catalog/trusted-keys.json';
+const keysBytes=git('cat-file','blob',frozenContract.manifest.sourceCommit+':'+keyPath);
+if(!(await readFile(resolve(root,keyPath))).equals(keysBytes)||!git('cat-file','blob',':'+keyPath).equals(keysBytes))throw Error('Trusted runtime keys have uncommitted drift');
+frozenContract.manifest.trustedKeys={path:keyPath,sha256:sha256(keysBytes)};
 const keys=JSON.parse(keysBytes);
 const stableRaw=await readFile(resolve(catalogDir,'stable.json'));
 const stable=verifyEnvelope(stableRaw.toString(),keys,'stable');
@@ -85,6 +89,7 @@ if(option('web')){
   for(const [name,bytes]of frozenContract.files){
     const target=resolve(contract,name);await mkdir(dirname(target),{recursive:true});await writeFile(target,bytes);
   }
+  await writeFile(resolve(contract,keyPath),keysBytes);
   await writeFile(resolve(contract,'source.json'),JSON.stringify(frozenContract.manifest,null,2)+'\n');
   await writeFile(resolve(out,'trusted-keys.json'),keysBytes);
   for(const channel of ['stable','preview']){

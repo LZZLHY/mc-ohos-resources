@@ -7,7 +7,7 @@ import {readFile,writeFile,mkdir,access} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {projectCatalogV2,projectLegacyCatalog,assertPublishedHostCoverage,fetchPublishedRuntimeHosts,derivePublishedReleaseClosure,validateReleaseProducts} from '../lib/catalog-v2.mjs';
-import {signCatalog,verifyEnvelope,validateTransition,sha256,assertIsolatedFixtureKey} from './protocol.mjs';
+import {signCatalog,verifyEnvelope,validateTransition,sha256,assertIsolatedFixtureKey,verifyRuntimeHostHistory} from './protocol.mjs';
 import {readDeliveryClosure,validateDeliveryReceipt} from './delivery.mjs';
 export {projectCatalogV2,projectLegacyCatalog,assertPublishedHostCoverage};
 const args=process.argv.slice(2),option=name=>{const i=args.indexOf('--'+name);return i<0?undefined:args[i+1];};
@@ -36,8 +36,9 @@ async function main(){
     if(deliveryClosure.sourceSha256!==sourceSha256)throw Error('source changed between candidate projection and delivery verification');
     validateDeliveryReceipt(assets,deliveryClosure);
   }
-  const releaseClosure=derivePublishedReleaseClosure(candidates.filter(([version])=>version===2).map(([, ,catalog])=>catalog),hosts,products);
   const key=await readFile(required('key'),'utf8');const keys=JSON.parse(await readFile(required('keys'),'utf8'));
+  const bindingCatalogs=fixture?[]:verifyRuntimeHostHistory(await readFile(resolve(dirname(fileURLToPath(import.meta.url)),'../catalog/host-history.json'),'utf8'),keys);
+  const releaseClosure=derivePublishedReleaseClosure(candidates.filter(([version])=>version===2).map(([, ,catalog])=>catalog),hosts,products,[],bindingCatalogs);
   if(fixture)assertIsolatedFixtureKey(key,JSON.parse(await readFile(resolve(dirname(fileURLToPath(import.meta.url)),'../catalog/trusted-keys.json'),'utf8')));
   const out=resolve(required('out'));try{await access(out);throw Error('candidate output already exists');}catch(e){if(e.code!=='ENOENT')throw e;}
   const signed=[];

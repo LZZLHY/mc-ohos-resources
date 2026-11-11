@@ -196,7 +196,8 @@ test('interruption after first channel is gated and idempotently resumes exact b
   await writeFile(resolve(root,'catalog/trusted-keys.json'),raw(keys));
   const oldPreview=raw(signCatalog(projectCatalog(f.source,'preview'),pair.privateKey,'test'));
   for(const channel of ['stable','preview'])await writeFile(resolve(root,'catalog/v1',channel+'.json'),raw(signCatalog(projectCatalog(f.source,channel),pair.privateKey,'test')));
-  f.source.catalogRevision++;f.source.runtimes[0].recommendations.preview.loaderProtocol=2;f.source.runtimes[0].recommendations.preview.recommendationRevision++;
+  // 同一build不能在两个通道声称不同的宿主要求；本用例只测目录代次与中断恢复。
+  f.source.catalogRevision++;f.source.runtimes[0].recommendations.preview.recommendationRevision++;
   await writeFile(resolve(root,'catalog/source.json'),raw(f.source));await writeFile(resolve(root,'provenance/build-inputs.json'),raw(f.index));
   await writeFile(resolve(root,'provenance',f.build.id+'.json'),f.receiptRaw);
   for(const channel of ['stable','preview'])await writeFile(resolve(candidate,channel+'.json'),raw(signCatalog(projectCatalog(f.source,channel),pair.privateKey,'test')));

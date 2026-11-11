@@ -7,7 +7,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2),option=name=>{const i=args.indexOf('--'+name);return i<0?undefined:args[i+1];};
-const contractNames=['tools/protocol.mjs','lib/catalog-validation.mjs','lib/catalog-v2.mjs'];
+const contractNames=['tools/protocol.mjs','lib/catalog-validation.mjs','lib/catalog-v2.mjs','catalog/host-history.json'];
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 /** 只允许Git约定的CRLF→LF变换，不trim、不重排、不改写模块正文或签名目录。 */
 function canonicalLF(bytes){return Buffer.from(new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes).replace(/\r\n/g,'\n'),'utf8');}

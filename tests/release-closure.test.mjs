@@ -232,7 +232,9 @@ test('已可手工下载的真实官方原件独立形成exposure，不造public
   const fake=publishedHostFacts(current,current,[{...manual,publicationId:'a'.repeat(64)}]);
   assert.throws(()=>deriveContract(catalogs(source),fake),/PUBLIC_HOST_EXPOSURE_IDENTITY_INVALID/);
   const newRecommended=sourceFixture();
-  assert.throws(()=>deriveContract(catalogs(newRecommended),facts),/PUBLIC_HOST_NOT_READY/);
+  const waiting=deriveContract(catalogs(newRecommended),facts);
+  assert(waiting.forward.filter(item=>item.requiredHostProtocol===2).every(item=>item.state==='waiting-host'&&item.host===null));
+  assert(waiting.returns.every(item=>item.fromHost.includes('/exposure/')),'等待宿主不能把手动曝光伪造为forward头，也不能免除返回义务');
 });
 
 test('stable同ABI也须覆盖已公开reader2，旧0/1小数据兼容不授予发布级普遍资格',()=>{

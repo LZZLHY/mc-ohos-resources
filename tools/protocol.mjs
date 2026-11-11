@@ -64,3 +64,18 @@ export function verifyEnvelope(bytes, keys, channel, now = Date.now(), allowExpi
   assert(allowExpired || Date.parse(catalog.expiresAt) > now,'catalog expired');
   return catalog;
 }
+
+/**
+ * 历史签名只证明当时推荐的逐build宿主身份，绝不恢复旧下载头/有效期。保存原始JWS而非
+ * 自报协议映射，首次v2迁移和legacy激活都能用固定公钥重算；未知/冲突仍由闭包拒绝。
+ */
+export function verifyRuntimeHostHistory(raw,keys){
+  assert(Buffer.byteLength(raw)<=4*MAX_CATALOG_BYTES,'runtime host history too large');
+  const value=JSON.parse(raw);
+  assert(value?.schemaVersion===1&&Array.isArray(value.entries)&&value.entries.length>0&&value.entries.length<=128,'invalid runtime host history');
+  return value.entries.map(entry=>{
+    assert(entry&&typeof entry.raw==='string'&&/^[0-9a-f]{64}$/.test(entry.sha256)&&sha256(entry.raw)===entry.sha256&&
+      ['stable','preview'].includes(entry.channel),'invalid historical signed catalog identity');
+    return verifyEnvelope(entry.raw,keys,entry.channel,Date.now(),true);
+  });
+}

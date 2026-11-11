@@ -177,8 +177,10 @@ recommendations 中维护有序 `recommendedBuildIds`（最多八项，可以为
 node tools/catalog-v2.mjs generate --source <v2-source.json> --asset-receipt <readback.json> --key <仓外私钥> --keys catalog/trusted-keys.json --kid amcl-runtime-2026-01 --previous <含v1/v2的上代目录> --out <全新候选目录>
 ```
 
-生成器直接读取官网已发布 App stable/preview 的 runtime-host 审计接口，要求每个推荐
-都有可达的公开宿主；JDK stable 必须有 App stable，不接受 developer 或 staged 收据。
+生成器读取官网真实公开宿主事实。已具兼容宿主的推荐标为ready；宿主尚未公开但真实
+要求高于旧协议的推荐可标为waiting-host，旧客户端按真实loaderProtocol拒绝下载。
+waiting-host不伪造公开App，不接受developer/staged收据充当已交付宿主；既有公开群体
+的reader、平台与返回义务仍须全部满足。App新头反向要求已经部署的稳定运行时供给。
 输出 v1/v2 各两个签名目录和 projection-receipt.json（sourceSha256、逻辑代次与四文件
 SHA/大小）。收据用于同批对账，不能替代 JWS 固定公钥验签。旧 activate 明确拒绝 v2，
 后续部署使用显式格式命名空间及该批收据，不用旧工具覆盖新目录。
@@ -236,7 +238,7 @@ staged、其它产品的HAP或表单“可返回”声明。返回证明用retur
 不承诺未纳入正向产品获得新宿主能力，也不拿手机事实代替desktop。
 
 结构 `check` 只说明候选格式，不能称公开发行资格通过。生产 `generate` 在读私钥前
-验证来源/全量原件收据，并派生正向与返回两图：每个推荐先有本批产品的公开App；预览
+验证来源/全量原件收据，并派生正向与返回两图：每个推荐区分真实公开App就绪与waiting-host；预览
 引入stable未支持的宿主时，两端须真实声明恢复协议2，stable不能降低安装code或设备/API
 范围。只要两目录保留历史build要求仍被公开preview支持而stable不支持，即使该build
 已退出推荐或已撤回，也可能仍装在用户槽中，返回义务持续到真实stable宿主覆盖为止。
@@ -272,7 +274,7 @@ deploy/RUNTIME-HOST-HISTORY-MIGRATION.md；生产回填不属于本轮代码授�
 新平台/新目录协议时须先设计明确演进，不能用全局runtime字段退休已安装用户。
 当前生产准入与客户端supportsRuntime一致，仅接受ohos/aarch64/musl、已实现adapter、
 minimumCatalogProtocol<=2；结构check仍能检查未来候选，不授予签名激活资格。
-缺桥接stable或任何安全替代即阻断签名，不机械发布当前旧稳定JDK8作为“回退”。
+已有公开群体缺桥接stable或任何安全替代时仍阻断签名，不机械发布当前旧稳定JDK8作为“回退”。
 
 新projection-receipt为schemaVersion2，绑定本批产品、生成时闭包、精确源/原件闭包摘要
 和四份签名文件。源在异步校验期间变化会拒绝，不会给旧payload写新source摘要。
@@ -291,3 +293,13 @@ receipt只作对账索引，权威仍是固定公钥JWS及真正激活时从官�
 `--fixture` 只允许隔离密钥：按SPKI拒绝与仓内固定生产公钥相同的key，改kid或改
 `--keys` 文件不能绕过。fixture文件可作本地结构/签名测试，但不能作为公开激活依据。
 本轮测试使用临时key和隔离网络边界，不签真实目录、不更换现有source、feeds或推荐。
+
+## 稳定运行时与App双向准入（2026-11-11）
+
+本轮工具改造不等于已发布新目录。`forward.state`明确为`ready`或`waiting-host`；后一状态没有公开宿主identity，不能宣称App已上线。缺协议1推荐时，v1使用第一项的真实loaderProtocol，旧1.0.6的生产过滤器会拒绝官方下载，已装旧槽保持。旧二进制的手动导入行为无法由远程目录追补。空推荐仍不能伪造为v1安全包。
+
+`catalog/host-history.json`保存原始签名历史，固定公钥逐份验证后只读取当时实际推荐的build绑定。`runtimeHostBindings`先合并当前/历史v1推荐与v2逐build事实，身份/协议冲突直接拒绝；没有证据的非推荐历史不猜1或2。历史签名可用于身份追溯，不用于恢复旧下载头或绕过有效期。
+
+新App在实际HAP中声明`runtimeRequiredCapabilities`与`runtimeRequiredMajors`。`assertAppRuntimeCoverage`要求实际stable v1/v2同源投影、未过期、覆盖目标最低API/ABI和每个major，并按客户端顺序选择同时满足host与行为的首项，再核源码/完整manifest和设备资格。新App回落v1不能重新选旧问题包；后续JDK发布同样不能抽走已公开App需要的稳定供给。
+
+`zipfs-transaction-v1`必须由已绑定来源收据的0019 ZIPFS补丁声明支撑，不能只手填capability。资格与包身份依旧不可假造，本地单平板结果不自动升级为device-matrix-tested。首批顺序为：准备并验证JDK资产和完整四文件batch→先部署真实v1并携带batch→部署同批v2→公开源全部就绪→App反向覆盖门通过后再公开App；本次未执行其中任何公开步骤。

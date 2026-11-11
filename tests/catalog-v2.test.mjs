@@ -38,7 +38,7 @@ test('strict per-build requirements reject unknown/missing fields and runtime le
 });
 test('empty v2 recommendations stop downloads; v1 cannot invent safe alternative',()=>{
  const source=sourceFixture();source.runtimes[0].recommendations.preview.recommendedBuildIds=[];
- validateCatalogV2(projectCatalogV2(source,'preview'));assert.throws(()=>projectLegacyCatalog(source,'preview'),/V1_NO_SAFE/);
+ validateCatalogV2(projectCatalogV2(source,'preview'));assert.throws(()=>projectLegacyCatalog(source,'preview'),/V1_NO_RECOMMENDATION/);
 });
 test('host requirement immutable, no withdrawn resurrection, recommendation revision independent',()=>{
  const old=projectCatalogV2(sourceFixture(),'preview');

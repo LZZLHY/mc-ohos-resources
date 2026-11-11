@@ -11,7 +11,7 @@ import {execFileSync,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
 const producer=fileURLToPath(new URL('..',import.meta.url));
-const names=['tools/protocol.mjs','lib/catalog-validation.mjs','lib/catalog-v2.mjs'];
+const names=['tools/protocol.mjs','lib/catalog-validation.mjs','lib/catalog-v2.mjs','catalog/host-history.json'];
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 
 test('export freezes committed Git blobs, canonical LF and exact source identity; dirty inputs fail closed',()=>{

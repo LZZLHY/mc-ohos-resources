@@ -39,6 +39,9 @@ export function validateBuildReceipt(raw, build) {
     'provenance archive identity mismatch: '+build.id);
   assert(receipt.build?.repository === build.provenance.sourceRepository &&
     receipt.build?.commit === build.provenance.sourceCommit, 'provenance upstream identity mismatch: '+build.id);
+  // 新App依据此能力决定旧槽是否可运行，发布者不能只在目录手填capability而遗漏真实修复来源。
+  if(build.capabilities.includes('zipfs-transaction-v1'))assert(HASH.test(receipt.build?.patches?.['0019-zipfs-permission-copy-transaction.patch']),
+    'ZIPFS capability lacks audited build input: '+build.id);
   return receipt;
 }
 

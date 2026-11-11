@@ -6,21 +6,23 @@
 import {readFile,writeFile,mkdir,access} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {projectCatalogV2,projectLegacyCatalog,assertPublishedHostCoverage,fetchPublishedRuntimeHosts,derivePublishedReleaseClosure,validateReleaseProducts} from '../lib/catalog-v2.mjs';
-import {signCatalog,verifyEnvelope,validateTransition,sha256,assertIsolatedFixtureKey} from './protocol.mjs';
+import {projectCatalogV2,projectCatalogCandidate,projectLegacyCatalog,projectLegacyCatalogFromV2,assertPublishedHostCoverage,fetchPublishedRuntimeHosts,derivePublishedReleaseClosure,validateReleaseProducts} from '../lib/catalog-v2.mjs';
+import {signCatalog,verifyEnvelope,validateTransition,sha256,assertIsolatedFixtureKey,verifyRuntimeHostHistory} from './protocol.mjs';
 import {readDeliveryClosure,validateDeliveryReceipt} from './delivery.mjs';
 export {projectCatalogV2,projectLegacyCatalog,assertPublishedHostCoverage};
 const args=process.argv.slice(2),option=name=>{const i=args.indexOf('--'+name);return i<0?undefined:args[i+1];};
 const required=name=>{const value=option(name);if(!value)throw Error('--'+name+' required');return value;};
 async function main(){
   const command=args[0]??'check',sourceRaw=await readFile(required('source')),source=JSON.parse(sourceRaw),sourceSha256=sha256(sourceRaw);
+  const validationOnly=command==='generate-validation';
+  if(validationOnly&&!args.includes('--fixture'))throw Error('Unqualified candidate validation requires an isolated fixture');
   const candidates=[];
   for(const channel of ['stable','preview']){
-    const modern=projectCatalogV2(source,channel);const legacy=projectLegacyCatalog(source,channel);
+    const modern=validationOnly?projectCatalogCandidate(source,channel):projectCatalogV2(source,channel);const legacy=projectLegacyCatalogFromV2(modern);
     candidates.push([2,channel,modern],[1,channel,legacy]);
   }
   if(command==='check'){console.log('v2 and compatible v1 structural candidates valid; public release closure not checked');return;}
-  if(command!=='generate')throw Error('Use check or generate');
+  if(command!=='generate'&&!validationOnly)throw Error('Use check, generate or isolated generate-validation');
   // 真正发行直接读取官网已发布头的产物审计，不能拿developer/staged收据充当“App先发”。
   // 离线签名测试必须显式fixture，回执标记不可用于公开激活；本工具没有上传/激活副作用。
   let hosts=[],deliveryClosure=null,assetReceiptSha256=null;const fixture=args.includes('--fixture'),products=validateReleaseProducts((option('products')??'sideload').split(','));
@@ -36,8 +38,9 @@ async function main(){
     if(deliveryClosure.sourceSha256!==sourceSha256)throw Error('source changed between candidate projection and delivery verification');
     validateDeliveryReceipt(assets,deliveryClosure);
   }
-  const releaseClosure=derivePublishedReleaseClosure(candidates.filter(([version])=>version===2).map(([, ,catalog])=>catalog),hosts,products);
   const key=await readFile(required('key'),'utf8');const keys=JSON.parse(await readFile(required('keys'),'utf8'));
+  const bindingCatalogs=fixture?[]:verifyRuntimeHostHistory(await readFile(resolve(dirname(fileURLToPath(import.meta.url)),'../catalog/host-history.json'),'utf8'),keys);
+  const releaseClosure=derivePublishedReleaseClosure(candidates.filter(([version])=>version===2).map(([, ,catalog])=>catalog),hosts,products,[],bindingCatalogs);
   if(fixture)assertIsolatedFixtureKey(key,JSON.parse(await readFile(resolve(dirname(fileURLToPath(import.meta.url)),'../catalog/trusted-keys.json'),'utf8')));
   const out=resolve(required('out'));try{await access(out);throw Error('candidate output already exists');}catch(e){if(e.code!=='ENOENT')throw e;}
   const signed=[];
@@ -68,7 +71,7 @@ async function main(){
     const root=option('delivery-root')?resolve(option('delivery-root')):resolve(dirname(fileURLToPath(import.meta.url)),'..');
     if((await readDeliveryClosure(root,required('source'))).closureSha256!==deliveryClosure.closureSha256)throw Error('delivery inputs changed during candidate generation');
   }
-  const receipt={schemaVersion:2,fixtureOnly:fixture,hostVerification:fixture?'isolated-fixture':'published-head-api',
+  const receipt={schemaVersion:2,fixtureOnly:fixture,validationOnly,hostVerification:fixture?'isolated-fixture':'published-head-api',
     sourceSha256,catalogRevision:source.catalogRevision,products,assetReceiptSha256,deliveryClosureSha256:deliveryClosure?.closureSha256??null,
     releaseClosure,releaseClosureSha256:sha256(JSON.stringify(releaseClosure)),files:{}};
   for(const [version,channel,envelope]of signed){const name='v'+version+'/'+channel+'.json',path=resolve(out,name),bytes=JSON.stringify(envelope,null,2)+'\n';await mkdir(dirname(path),{recursive:true});await writeFile(path,bytes,{flag:'wx'});receipt.files[name]={sha256:sha256(bytes),sizeBytes:Buffer.byteLength(bytes)};}

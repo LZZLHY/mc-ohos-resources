@@ -7,7 +7,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const args=process.argv.slice(2),option=name=>{const i=args.indexOf('--'+name);return i<0?undefined:args[i+1];};
-const contractNames=['tools/protocol.mjs','lib/catalog-validation.mjs','lib/catalog-v2.mjs'];
+const contractNames=['tools/protocol.mjs','lib/catalog-validation.mjs','lib/catalog-v2.mjs','catalog/host-history.json'];
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 /** 只允许Git约定的CRLF→LF变换，不trim、不重排、不改写模块正文或签名目录。 */
 function canonicalLF(bytes){return Buffer.from(new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes).replace(/\r\n/g,'\n'),'utf8');}
@@ -60,36 +60,44 @@ const {verifyEnvelope}=await import('./protocol.mjs');
 const {assertNoPendingActivation}=await import('./activation.mjs');
 const catalogDir=resolve(option('catalog-dir')||resolve(root,'catalog/v1'));
 await assertNoPendingActivation(root);
-const keysBytes=await readFile(resolve(root,'catalog/trusted-keys.json'));
+// 公钥也是独立可部署的信任输入，保留Git原字节，不把工作副本或待导出目录当新信任根。
+const keyPath='catalog/trusted-keys.json';
+const keysBytes=git('cat-file','blob',frozenContract.manifest.sourceCommit+':'+keyPath);
+if(!(await readFile(resolve(root,keyPath))).equals(keysBytes)||!git('cat-file','blob',':'+keyPath).equals(keysBytes))throw Error('Trusted runtime keys have uncommitted drift');
+frozenContract.manifest.trustedKeys={path:keyPath,sha256:sha256(keysBytes)};
 const keys=JSON.parse(keysBytes);
-const stableRaw=await readFile(resolve(catalogDir,'stable.json'));
-const stable=verifyEnvelope(stableRaw.toString(),keys,'stable');
+const contractsOnly=args.includes('--contracts-only');
+const stableRaw=contractsOnly?null:await readFile(resolve(catalogDir,'stable.json'));
+const stable=contractsOnly?null:verifyEnvelope(stableRaw.toString(),keys,'stable');
 // 在任何消费者写入前验证另一个通道，避免随后发现 preview 损坏而留下半批副本。
-const previewRaw=await readFile(resolve(catalogDir,'preview.json'));
-verifyEnvelope(previewRaw.toString(),keys,'preview');
-if(option('app')){
+const previewRaw=contractsOnly?null:await readFile(resolve(catalogDir,'preview.json'));
+if(!contractsOnly)verifyEnvelope(previewRaw.toString(),keys,'preview');
+/** 构建门与官网部署消费同一冻结验证器；仅导出契约时不改任何App初始化目录或公开投影。 */
+async function writeContract(destination){
+  const contract=resolve(destination,'scripts/runtime-catalog-contract');
+  for(const [name,bytes]of frozenContract.files){const target=resolve(contract,name);await mkdir(dirname(target),{recursive:true});await writeFile(target,bytes);}
+  await writeFile(resolve(contract,keyPath),keysBytes);
+  await writeFile(resolve(contract,'source.json'),JSON.stringify(frozenContract.manifest,null,2)+'\n');
+}
+if(option('app'))await writeContract(option('app'));
+if(option('web'))await writeContract(option('web'));
+if(option('app')&&!contractsOnly){
   const out=resolve(option('app'),'entry/src/main/resources/rawfile/runtime-catalog');await mkdir(out,{recursive:true});
   await writeFile(resolve(out,'builtin.json'),JSON.stringify(stable,null,2)+'\n');
   await writeFile(resolve(out,'trusted-keys.json'),keysBytes);
   await writeFile(resolve(out,'origin.json'),JSON.stringify({schemaVersion:1,repository:'LZZLHY/mc-ohos-resources',catalogRevision:stable.catalogRevision,signedCatalogSha256:sha256(stableRaw),keysSha256:sha256(keysBytes)},null,2)+'\n');
 }
-if(option('web')){
+if(option('web')&&!contractsOnly){
   const out=resolve(option('web'),'web/src/runtime/generated');await mkdir(out,{recursive:true});
   for(const name of ['catalog-validation.mjs','browser-catalog.mjs']){
     const frozen=frozenContract.files.get('lib/'+name);
     if(frozen)await writeFile(resolve(out,name),frozen);
     else await copyFile(resolve(root,'lib',name),resolve(out,name));
   }
-  // 官网部署校验器必须在clean clone自足，不能运行时穿越到维护者的兄弟资源仓。
-  const contract=resolve(option('web'),'scripts/runtime-catalog-contract');
-  for(const [name,bytes]of frozenContract.files){
-    const target=resolve(contract,name);await mkdir(dirname(target),{recursive:true});await writeFile(target,bytes);
-  }
-  await writeFile(resolve(contract,'source.json'),JSON.stringify(frozenContract.manifest,null,2)+'\n');
   await writeFile(resolve(out,'trusted-keys.json'),keysBytes);
   for(const channel of ['stable','preview']){
     const raw=channel==='stable'?stableRaw:previewRaw;
     await writeFile(resolve(out,channel+'.json'),raw);
   }
 }
-console.log('Exported verified catalog projections (private key not read).');
+console.log(contractsOnly?'Exported committed runtime contracts only; catalogs untouched.':'Exported verified catalog projections (private key not read).');

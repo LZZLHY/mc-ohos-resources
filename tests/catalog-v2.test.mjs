@@ -38,7 +38,7 @@ test('strict per-build requirements reject unknown/missing fields and runtime le
 });
 test('empty v2 recommendations stop downloads; v1 cannot invent safe alternative',()=>{
  const source=sourceFixture();source.runtimes[0].recommendations.preview.recommendedBuildIds=[];
- validateCatalogV2(projectCatalogV2(source,'preview'));assert.throws(()=>projectLegacyCatalog(source,'preview'),/V1_NO_SAFE/);
+ validateCatalogV2(projectCatalogV2(source,'preview'));assert.throws(()=>projectLegacyCatalog(source,'preview'),/V1_NO_RECOMMENDATION/);
 });
 test('host requirement immutable, no withdrawn resurrection, recommendation revision independent',()=>{
  const old=projectCatalogV2(sourceFixture(),'preview');
@@ -70,6 +70,17 @@ test('isolated CLI generates four verified namespace candidates and refuses over
    const success=spawnSync(process.execPath,command,{encoding:'utf8'});assert.equal(success.status,0,success.stderr);
    for(const version of[1,2])for(const channel of['stable','preview'])assert.equal(verifyEnvelope(fs.readFileSync(area+'/candidate/v'+version+'/'+channel+'.json','utf8'),keys,channel).schemaVersion,version);
    assert.notEqual(spawnSync(process.execPath,command,{encoding:'utf8'}).status,0);
+   // 未完成设备矩阵的真实候选只允许隔离签名验收，不能伪写资格或拿生产生成入口放行。
+   const pending=sourceFixture(),runtime=pending.runtimes[0],build=pending.builds.find(b=>b.id===runtime.recommendations.preview.recommendedBuildIds[0]);
+   build.provenance={kind:'source-build',sourceRepository:'https://github.com/openjdk/fixture',sourceCommit:'b'.repeat(40),manifestSha256:'c'.repeat(64),evidence:['fixture only']};
+   build.validationLevel='artifact-audited';runtime.recommendations.stable.recommendedBuildIds=[build.id];
+   fs.writeFileSync(area+'/pending.json',JSON.stringify(pending));
+   const validation=command.map(value=>value==='generate'?'generate-validation':value===area+'/source.json'?area+'/pending.json':value===area+'/candidate'?area+'/validation':value);
+   const validated=spawnSync(process.execPath,validation,{encoding:'utf8'});assert.equal(validated.status,0,validated.stderr);
+   const validationReceipt=JSON.parse(fs.readFileSync(area+'/validation/projection-receipt.json','utf8'));assert.equal(validationReceipt.fixtureOnly,true);assert.equal(validationReceipt.validationOnly,true);
+   const ordinary=spawnSync(process.execPath,validation.map(value=>value==='generate-validation'?'generate':value===area+'/validation'?area+'/not-approved':value),{encoding:'utf8'});
+   assert.notEqual(ordinary.status,0);assert.match(ordinary.stderr,/device matrix/);assert(!fs.existsSync(area+'/not-approved'));
+   const noFixture=spawnSync(process.execPath,validation.filter(value=>value!=='--fixture'),{encoding:'utf8'});assert.notEqual(noFixture.status,0);assert.match(noFixture.stderr,/isolated fixture/);
    // 第一代v2发布只有v1历史；仍验证两份v1，不能要求尚不存在的v2前代文件。
    fs.mkdirSync(area+'/previous/v1',{recursive:true});
    for(const channel of ['stable','preview'])fs.copyFileSync(area+'/candidate/v1/'+channel+'.json',area+'/previous/v1/'+channel+'.json');

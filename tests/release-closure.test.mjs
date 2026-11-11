@@ -82,6 +82,17 @@ test('合法停止推荐或撤回2仍保留逐major返回义务；同一签名�
   }
 });
 
+test('旧伴随v1补宿主身份但不覆盖当前撤回状态，返回义务继续保留',()=>{
+  const original=sourceFixture(),before=catalogs(original).map(projectLegacyCatalogFromV2);
+  const after=catalogs(retireHost2(original,{withdrawn:true}));
+  const proof=derivePublishedReleaseClosure(after,hosts(),['sideload'],before);
+  assert.equal(proof.returns.length,2);
+  for(const graph of proof.returns){
+    assert.equal(graph.retainedBuilds.length,original.runtimes.length);
+    assert(graph.retainedBuilds.every(build=>build.requiredHostProtocol===2&&build.status==='withdrawn'));
+  }
+});
+
 test('装preview2后只切JDK stable也需其独立合格替代，不能借preview；真实v1投影必须合格',()=>{
   const source=retireHost2(sourceFixture());
   const unsafe=retireHost2(source,{channel:'stable',qualified:false});
@@ -232,7 +243,9 @@ test('已可手工下载的真实官方原件独立形成exposure，不造public
   const fake=publishedHostFacts(current,current,[{...manual,publicationId:'a'.repeat(64)}]);
   assert.throws(()=>deriveContract(catalogs(source),fake),/PUBLIC_HOST_EXPOSURE_IDENTITY_INVALID/);
   const newRecommended=sourceFixture();
-  assert.throws(()=>deriveContract(catalogs(newRecommended),facts),/PUBLIC_HOST_NOT_READY/);
+  const waiting=deriveContract(catalogs(newRecommended),facts);
+  assert(waiting.forward.filter(item=>item.requiredHostProtocol===2).every(item=>item.state==='waiting-host'&&item.host===null));
+  assert(waiting.returns.every(item=>item.fromHost.includes('/exposure/')),'等待宿主不能把手动曝光伪造为forward头，也不能免除返回义务');
 });
 
 test('stable同ABI也须覆盖已公开reader2，旧0/1小数据兼容不授予发布级普遍资格',()=>{

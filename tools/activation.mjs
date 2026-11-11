@@ -6,7 +6,7 @@
 import {readFile,mkdir,open,rename,unlink,lstat} from 'node:fs/promises';
 import {resolve,relative,isAbsolute,dirname} from 'node:path';
 import {readDeliveryClosure,validateDeliveryReceipt} from './delivery.mjs';
-import {sha256,verifyEnvelope,validateTransition,MAX_CATALOG_BYTES,buildIdentity} from './protocol.mjs';
+import {sha256,verifyEnvelope,validateTransition,MAX_CATALOG_BYTES,buildIdentity,verifyRuntimeHostHistory} from './protocol.mjs';
 import {projectCatalog} from './catalog.mjs';
 import {fetchPublishedRuntimeHosts,derivePublishedReleaseClosure,validateReleaseProducts,assertLegacyReturnCoverage} from '../lib/catalog-v2.mjs';
 
@@ -78,7 +78,9 @@ export async function activateCatalog({root,candidateDir,receiptPath,transaction
     assert(fresh&&buildIdentity(old)===buildIdentity(fresh)&&(old.status!=='withdrawn'||fresh.status==='withdrawn'),'companion build identity removed, changed or revived');
   }
   // 签名/旧资产收据不代表依赖永远有效：真正激活前从固定官网重读实际公开HAP并派生返回图。
-  const releaseClosure=derivePublishedReleaseClosure(prepared.map(item=>item.catalog),await fetchPublishedRuntimeHosts(fetchImpl,products),products,companionCatalogs);
+  const hostHistory=await optionalRead(resolve(root,'catalog/host-history.json'));
+  const bindingCatalogs=hostHistory?verifyRuntimeHostHistory(hostHistory.toString('utf8'),keys):[];
+  const releaseClosure=derivePublishedReleaseClosure(prepared.map(item=>item.catalog),await fetchPublishedRuntimeHosts(fetchImpl,products),products,companionCatalogs,bindingCatalogs);
   const legacyReturnCoverage=assertLegacyReturnCoverage(prepared.map(item=>item.catalog),releaseClosure);
   const releaseCheck={schemaVersion:1,checkedAt:new Date().toISOString(),sourceSha256:closure.sourceSha256,
     catalogFiles:Object.fromEntries(prepared.map(item=>[item.channel,sha256(item.bytes)])),releaseClosure,legacyReturnCoverage,

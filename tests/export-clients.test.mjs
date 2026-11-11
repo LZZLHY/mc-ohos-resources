@@ -63,6 +63,16 @@ test('export freezes committed Git blobs, canonical LF and exact source identity
       assert(!fs.existsSync(result.app),'dirty verifier must be rejected before writing app builtin');
     };
     check('clean export records the frozen commit and exact module Git blob hashes',()=>verify(run('clean'),initial));
+    check('contracts-only exports gates without changing or creating catalog snapshots',()=>{
+      const app=path.join(area,'contracts-app'),web=path.join(area,'contracts-web');
+      const result=spawnSync(process.execPath,[path.join(repo,'tools/export-clients.mjs'),'--contracts-only','--app',app,'--web',web],{cwd:repo,encoding:'utf8'});
+      assert.equal(result.status,0,result.stderr);assert(fs.existsSync(path.join(app,'scripts/runtime-catalog-contract/source.json')));
+      assert(!fs.existsSync(path.join(app,'entry')));assert(!fs.existsSync(path.join(web,'web')));
+    });
+    check('working trust-anchor drift is rejected before consumer writes',()=>{
+      const name='catalog/trusted-keys.json',original=fs.readFileSync(path.join(repo,name));
+      fs.writeFileSync(path.join(repo,name),'{}');rejected('dirty-keys',/Trusted runtime keys have uncommitted drift/);fs.writeFileSync(path.join(repo,name),original);
+    });
     check('CRLF checkout exports canonical LF blobs without changing source identity',()=>{
       for(const name of names){const blob=git('cat-file','blob',initial+':'+name);fs.writeFileSync(path.join(repo,name),blob.toString('utf8').replace(/\n/g,'\r\n'));}
       const manifest=verify(run('crlf'),initial);assert.deepEqual(manifest.normalizationEvidence.normalizedFiles.sort(),names.slice().sort());assert.equal(manifest.normalizationEvidence.canonicalBytesMatchCommit,true);

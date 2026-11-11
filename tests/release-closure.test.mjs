@@ -82,6 +82,17 @@ test('合法停止推荐或撤回2仍保留逐major返回义务；同一签名�
   }
 });
 
+test('旧伴随v1补宿主身份但不覆盖当前撤回状态，返回义务继续保留',()=>{
+  const original=sourceFixture(),before=catalogs(original).map(projectLegacyCatalogFromV2);
+  const after=catalogs(retireHost2(original,{withdrawn:true}));
+  const proof=derivePublishedReleaseClosure(after,hosts(),['sideload'],before);
+  assert.equal(proof.returns.length,2);
+  for(const graph of proof.returns){
+    assert.equal(graph.retainedBuilds.length,original.runtimes.length);
+    assert(graph.retainedBuilds.every(build=>build.requiredHostProtocol===2&&build.status==='withdrawn'));
+  }
+});
+
 test('装preview2后只切JDK stable也需其独立合格替代，不能借preview；真实v1投影必须合格',()=>{
   const source=retireHost2(sourceFixture());
   const unsafe=retireHost2(source,{channel:'stable',qualified:false});

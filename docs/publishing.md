@@ -296,6 +296,10 @@ receipt只作对账索引，权威仍是固定公钥JWS及真正激活时从官�
 
 ## 稳定运行时与App双向准入（2026-11-11）
 
+四代既有新原件通过 `tools/prepare-stable-runtimes.mjs --input <四套绝对路径清单> --out <仓外新目录>` 准备同批稳定候选。输入必须恰为8/17/21/25，逐套核完整运行ZIP、原始manifest、源码输入ZIP与SDK providers；保留原件文件名和SHA，不重新打包来改变身份。输出含候选source、来源记录、输入索引、资产映射与准备收据，不修改仓内source、不签名、不上传。已有R12的能力也按其原始0019补丁来源补全，不能只把本批code候选识别为修复包。
+
+这一步只授予`artifact-audited`。单台平板验收不能写成完整`device-matrix-tested`，正常`generate`继续拒绝未获发行资格的推荐。未发布联调可显式用`generate-validation --fixture`与隔离公钥生成四份候选目录，收据必带`fixtureOnly`/`validationOnly`；生产激活不接受此收据。测试公钥不得合入生产信任根，验收HAP的资源差异、端口转发、缓存和退出目标必须另行登记。
+
 本轮工具改造不等于已发布新目录。`forward.state`明确为`ready`或`waiting-host`；后一状态没有公开宿主identity，不能宣称App已上线。缺协议1推荐时，v1使用第一项的真实loaderProtocol，旧1.0.6的生产过滤器会拒绝官方下载，已装旧槽保持。旧二进制的手动导入行为无法由远程目录追补。空推荐仍不能伪造为v1安全包。
 
 `catalog/host-history.json`保存原始签名历史，固定公钥逐份验证后只读取当时实际推荐的build绑定。`runtimeHostBindings`先合并当前/历史v1推荐与v2逐build事实，身份/协议冲突直接拒绝；没有证据的非推荐历史不猜1或2。历史签名可用于身份追溯，不用于恢复旧下载头或绕过有效期。

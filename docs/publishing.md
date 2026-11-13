@@ -14,7 +14,13 @@
 - `0026-ohos-javasound-native-midi.patch` 同样依赖正常加载宿主的typed回调，即使单独推荐该实现也必须协议2。该约束不授权旧HAP调用新回调表。
 - 稳定通道新源码构建必须达到 `device-matrix-tested`，legacy 为兼容迁移例外。当前新包均在预览通道，用户单场景反馈不能冒充设备矩阵。
 
-## 标准步骤
+## 当前 v2 入口与旧 v1 工具
+
+当前唯一手工源 `catalog/source.json` 已迁移到 schema 2。使用 `node tools/catalog-v2.mjs check --source catalog/source.json` 做结构检查，`node tools/publish.mjs check` 做来源闭包检查；生产生成、实际资产回读与同批四文件部署按本文后面的 v2 / 联合准入步骤执行。`tools/catalog.mjs` 的 v1 生成入口仍用于明确的历史 v1 工作，不能把 v2 源交给旧生成器。
+
+旧协议回归使用 `tests/fixtures/source-v1.json`，固定于提交 `909c51f1d322de784cf6b68d8786d6ccbbcbdb25` 的真实 v1 源；测试 helper 只更新测试时钟，不给历史原件补造新能力。`current-catalog.test.mjs` 独立验证当前真实 v2 源、四个已签目录与完整来源闭包。旧客户端准入工具在 v2 源下从固定公钥验过的历史 stable 签名中取得 host1 基线，再核当前兼容投影的拒绝行为，不依赖测试夹具冒认公开历史。
+
+## 历史 v1 标准步骤
 
 要求 Node 22+、已登录有写权限的 `gh`、主工程 Docker 构建环境。签名私钥和 HAP 证书分离，由维护者保管，不能上传网页服务器。初次 keygen 只运行一次；信任根轮换需客户端迁移，不能覆盖现用键。
 

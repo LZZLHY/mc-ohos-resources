@@ -1,8 +1,8 @@
 {
-  "schemaVersion": 1,
-  "catalogRevision": 4,
-  "issuedAt": "2026-10-23T06:12:55Z",
-  "expiresAt": "2027-09-26T18:16:22Z",
+  "schemaVersion": 2,
+  "catalogRevision": 6,
+  "issuedAt": "2026-11-13T12:47:32Z",
+  "expiresAt": "2027-02-11T12:47:32Z",
   "runtimes": [
     {
       "id": "java8-ohos-aarch64",
@@ -14,16 +14,18 @@
       "adapter": "classic-jre-v1",
       "minimumCatalogProtocol": 1,
       "minimumApi": 20,
-      "loaderProtocol": 1,
       "recommendations": {
         "stable": {
-          "recommendationRevision": 1,
-          "recommendedBuildId": "8u452-ohos-4"
+          "recommendationRevision": 2,
+          "recommendedBuildIds": [
+            "jdk8-ohos-20261027-code1"
+          ]
         },
         "preview": {
-          "recommendationRevision": 4,
-          "recommendedBuildId": "jdk8-ohos-20261022-repair12",
-          "loaderProtocol": 2
+          "recommendationRevision": 5,
+          "recommendedBuildIds": [
+            "jdk8-ohos-20261027-code1"
+          ]
         }
       }
     },
@@ -37,16 +39,18 @@
       "adapter": "modular-jdk-v1",
       "minimumCatalogProtocol": 1,
       "minimumApi": 20,
-      "loaderProtocol": 1,
       "recommendations": {
         "stable": {
-          "recommendationRevision": 1,
-          "recommendedBuildId": "17.0.13-ohos-5"
+          "recommendationRevision": 2,
+          "recommendedBuildIds": [
+            "jdk17-ohos-20261027-code1"
+          ]
         },
         "preview": {
-          "recommendationRevision": 3,
-          "recommendedBuildId": "jdk17-ohos-20261022-repair12",
-          "loaderProtocol": 2
+          "recommendationRevision": 4,
+          "recommendedBuildIds": [
+            "jdk17-ohos-20261027-code1"
+          ]
         }
       }
     },
@@ -60,16 +64,18 @@
       "adapter": "modular-jdk-v1",
       "minimumCatalogProtocol": 1,
       "minimumApi": 20,
-      "loaderProtocol": 1,
       "recommendations": {
         "stable": {
-          "recommendationRevision": 1,
-          "recommendedBuildId": "21.0.5-ohos-7"
+          "recommendationRevision": 2,
+          "recommendedBuildIds": [
+            "jdk21-ohos-20261027-code2"
+          ]
         },
         "preview": {
-          "recommendationRevision": 3,
-          "recommendedBuildId": "jdk21-ohos-20261022-repair12",
-          "loaderProtocol": 2
+          "recommendationRevision": 4,
+          "recommendedBuildIds": [
+            "jdk21-ohos-20261027-code2"
+          ]
         }
       }
     },
@@ -83,16 +89,18 @@
       "adapter": "modular-jdk-v1",
       "minimumCatalogProtocol": 1,
       "minimumApi": 20,
-      "loaderProtocol": 1,
       "recommendations": {
         "stable": {
-          "recommendationRevision": 1,
-          "recommendedBuildId": "25.0.4-ohos-2"
+          "recommendationRevision": 2,
+          "recommendedBuildIds": [
+            "jdk25-ohos-20261027-code1"
+          ]
         },
         "preview": {
-          "recommendationRevision": 3,
-          "recommendedBuildId": "jdk25-ohos-20261022-repair12",
-          "loaderProtocol": 2
+          "recommendationRevision": 4,
+          "recommendedBuildIds": [
+            "jdk25-ohos-20261027-code1"
+          ]
         }
       }
     }
@@ -156,7 +164,8 @@
           "旧资产逐字节 SHA-256 与大小已核对。sourceCommit 是目录迁移前发布仓身份，不代表整包上游源码身份。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 1
     },
     {
       "id": "17.0.13-ohos-5",
@@ -221,7 +230,8 @@
           "旧资产逐字节 SHA-256 与大小已核对。sourceCommit 是目录迁移前发布仓身份，不代表整包上游源码身份。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 1
     },
     {
       "id": "17-runtime-audio-rc2",
@@ -267,7 +277,8 @@
           "用户反馈：新 JDK17 + 新 HAP，Minecraft 1.20.1 + Immersive Melodies 通过；未收到对应设备日志及包摘要，不能推广至全部场景。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 1
     },
     {
       "id": "21.0.5-ohos-7",
@@ -332,7 +343,8 @@
           "旧资产逐字节 SHA-256 与大小已核对。sourceCommit 是目录迁移前发布仓身份，不代表整包上游源码身份。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 1
     },
     {
       "id": "21-runtime-audio-rc2",
@@ -377,7 +389,8 @@
           "RC2 完整打包、ELF 依赖审计与宿主 Java Sound 测试通过。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 1
     },
     {
       "id": "25.0.4-ohos-2",
@@ -442,7 +455,8 @@
           "旧资产逐字节 SHA-256 与大小已核对。sourceCommit 是目录迁移前发布仓身份，不代表整包上游源码身份。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 1
     },
     {
       "id": "25-runtime-audio-rc2",
@@ -487,7 +501,8 @@
           "RC2 完整打包、ELF 依赖审计与宿主 Java Sound 测试通过。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 1
     },
     {
       "id": "8-catalog-rc1",
@@ -534,7 +549,8 @@
           "不据此声称 OHOS JVM 或真机模组矩阵已经通过。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 1
     },
     {
       "id": "8-runtime-link-rc1",
@@ -586,7 +602,8 @@
           "后续原生第一现场为libgl4es.so+0xbd268 / gl4es_glMultiDrawArrays+0x2c8，SIGSEGV/SEGV_MAPERR，地址0x288；HotSpot最终abort。未把该游戏或完整设备矩阵标为通过。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 1
     },
     {
       "id": "jdk8-ohos-20261022-repair12",
@@ -617,7 +634,8 @@
         "headless-awt",
         "duplex-requires-permission-and-device-test",
         "ohmidi-api24-optional-midi1",
-        "device-ports-requires-device-test"
+        "device-ports-requires-device-test",
+        "zipfs-transaction-v1"
       ],
       "validationLevel": "artifact-audited",
       "provenance": {
@@ -629,7 +647,8 @@
           "完整runtime/source、音频/MIDI/Ports/native-temp和DT_NEEDED/SDK静态门按本包SHA核验；设备有限范围见发布验收记录。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 2
     },
     {
       "id": "jdk17-ohos-20261022-repair12",
@@ -660,7 +679,8 @@
         "headless-awt",
         "duplex-requires-permission-and-device-test",
         "ohmidi-api24-optional-midi1",
-        "device-ports-requires-device-test"
+        "device-ports-requires-device-test",
+        "zipfs-transaction-v1"
       ],
       "validationLevel": "artifact-audited",
       "provenance": {
@@ -672,7 +692,8 @@
           "完整runtime/source、音频/MIDI/Ports/native-temp和DT_NEEDED/SDK静态门按本包SHA核验；设备有限范围见发布验收记录。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 2
     },
     {
       "id": "jdk21-ohos-20261022-repair12",
@@ -703,7 +724,8 @@
         "headless-awt",
         "duplex-requires-permission-and-device-test",
         "ohmidi-api24-optional-midi1",
-        "device-ports-requires-device-test"
+        "device-ports-requires-device-test",
+        "zipfs-transaction-v1"
       ],
       "validationLevel": "artifact-audited",
       "provenance": {
@@ -715,7 +737,8 @@
           "完整runtime/source、音频/MIDI/Ports/native-temp和DT_NEEDED/SDK静态门按本包SHA核验；设备有限范围见发布验收记录。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 2
     },
     {
       "id": "jdk25-ohos-20261022-repair12",
@@ -746,7 +769,8 @@
         "headless-awt",
         "duplex-requires-permission-and-device-test",
         "ohmidi-api24-optional-midi1",
-        "device-ports-requires-device-test"
+        "device-ports-requires-device-test",
+        "zipfs-transaction-v1"
       ],
       "validationLevel": "artifact-audited",
       "provenance": {
@@ -758,7 +782,208 @@
           "完整runtime/source、音频/MIDI/Ports/native-temp和DT_NEEDED/SDK静态门按本包SHA核验；设备有限范围见发布验收记录。"
         ]
       },
-      "status": "available"
+      "status": "available",
+      "requiredHostProtocol": 2
+    },
+    {
+      "id": "jdk8-ohos-20261027-code1",
+      "runtimeId": "java8-ohos-aarch64",
+      "javaVersion": "1.8.0_452",
+      "legacyTags": [],
+      "archive": {
+        "type": "zip",
+        "fileName": "jdk8-ohos-20261027-code1.zip",
+        "sizeBytes": 106785307,
+        "sha256": "a50d049bebdbc07c1a678d51cd078e68e6b6b1533035d18693e36d7b493174c5"
+      },
+      "downloads": [
+        {
+          "sourceId": "github",
+          "transport": "single-file",
+          "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk8-ohos-20261027-code1.zip"
+        },
+        {
+          "sourceId": "web",
+          "transport": "single-file",
+          "url": "https://amcl.lovedhy.cn/runtimes/packages/jdk8-ohos-20261027-code1.zip"
+        }
+      ],
+      "notes": [
+        "修复ZIP/JAR事务写回与原件保留；需要支持宿主协议2的AMCL。",
+        "本批正式资格按维护者确认的原版门槛：MRDI-W10/API26，Minecraft 1.12.2、1.16.5 的运行、保存、退出及冷重载通过。",
+        "其他设备/最低API、联机、外设及完整整合包未作全面认证；Prominence、DH等限制另见资格记录。"
+      ],
+      "capabilities": [
+        "headless-awt",
+        "duplex-requires-permission-and-device-test",
+        "ohmidi-api24-optional-midi1",
+        "device-ports-requires-device-test",
+        "zipfs-transaction-v1"
+      ],
+      "validationLevel": "device-matrix-tested",
+      "provenance": {
+        "kind": "source-build",
+        "sourceRepository": "https://github.com/openjdk/jdk8u-dev.git",
+        "sourceCommit": "35c254f58c70663df28cc7d15c9545c88250b6ce",
+        "manifestSha256": "013af8176b2479123a4631a5a69963394fbf046f565fe6921fdd1c72836446cf",
+        "evidence": [
+          "精确运行包、来源输入和SDK/原生闭包由prepare-stable-runtimes重新验证；设备资格单独记录。",
+          "qualifications/jdk-code-20261113-vanilla-release.json sha256=221efd8c861602d9e3fe1c8be64d530dd62356147ea20bc66597c72828308915",
+          "原始已登记设备验收 sha256=d6813977eaca98b4d1b7620b628bef155ce622f605b3526e7100d9b48a17ff84；仅授予记录内的维护者选定矩阵。"
+        ]
+      },
+      "status": "available",
+      "requiredHostProtocol": 2
+    },
+    {
+      "id": "jdk17-ohos-20261027-code1",
+      "runtimeId": "java17-ohos-aarch64",
+      "javaVersion": "17.0.19",
+      "legacyTags": [],
+      "archive": {
+        "type": "zip",
+        "fileName": "jdk17-ohos-20261027-code1.zip",
+        "sizeBytes": 187472573,
+        "sha256": "6f8503d4d85c0bc8228b979a6a5827ad8a3960ad0a231384e76531ca0576f6cf"
+      },
+      "downloads": [
+        {
+          "sourceId": "github",
+          "transport": "single-file",
+          "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk17-ohos-20261027-code1.zip"
+        },
+        {
+          "sourceId": "web",
+          "transport": "single-file",
+          "url": "https://amcl.lovedhy.cn/runtimes/packages/jdk17-ohos-20261027-code1.zip"
+        }
+      ],
+      "notes": [
+        "修复ZIP/JAR事务写回与原件保留；需要支持宿主协议2的AMCL。",
+        "本批正式资格按维护者确认的原版门槛：MRDI-W10/API26，Minecraft 1.20.1 的运行、保存、退出及冷重载通过。",
+        "其他设备/最低API、联机、外设及完整整合包未作全面认证；Prominence、DH等限制另见资格记录。"
+      ],
+      "capabilities": [
+        "headless-awt",
+        "duplex-requires-permission-and-device-test",
+        "ohmidi-api24-optional-midi1",
+        "device-ports-requires-device-test",
+        "zipfs-transaction-v1"
+      ],
+      "validationLevel": "device-matrix-tested",
+      "provenance": {
+        "kind": "source-build",
+        "sourceRepository": "https://github.com/openjdk/jdk17u.git",
+        "sourceCommit": "b7d004b4f2787ea49454291d48326ad1cd97c0d0",
+        "manifestSha256": "c4b7c15417869df1c92b202a7fe0f160fdd7457a8c78482ec742664294b99a28",
+        "evidence": [
+          "精确运行包、来源输入和SDK/原生闭包由prepare-stable-runtimes重新验证；设备资格单独记录。",
+          "qualifications/jdk-code-20261113-vanilla-release.json sha256=221efd8c861602d9e3fe1c8be64d530dd62356147ea20bc66597c72828308915",
+          "原始已登记设备验收 sha256=d6813977eaca98b4d1b7620b628bef155ce622f605b3526e7100d9b48a17ff84；仅授予记录内的维护者选定矩阵。"
+        ]
+      },
+      "status": "available",
+      "requiredHostProtocol": 2
+    },
+    {
+      "id": "jdk21-ohos-20261027-code2",
+      "runtimeId": "java21-ohos-aarch64",
+      "javaVersion": "21.0.5",
+      "legacyTags": [],
+      "archive": {
+        "type": "zip",
+        "fileName": "jdk21-ohos-20261027-code2.zip",
+        "sizeBytes": 200497110,
+        "sha256": "a9765c3c8779f696f5d37a112108e3ae760a3b123d781640dcd29126e66c66ce"
+      },
+      "downloads": [
+        {
+          "sourceId": "github",
+          "transport": "single-file",
+          "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk21-ohos-20261027-code2.zip"
+        },
+        {
+          "sourceId": "web",
+          "transport": "single-file",
+          "url": "https://amcl.lovedhy.cn/runtimes/packages/jdk21-ohos-20261027-code2.zip"
+        }
+      ],
+      "notes": [
+        "修复ZIP/JAR事务写回与原件保留；需要支持宿主协议2的AMCL。",
+        "本批正式资格按维护者确认的原版门槛：MRDI-W10/API26，Minecraft 1.21.4 的运行、保存、退出及冷重载通过。",
+        "其他设备/最低API、联机、外设及完整整合包未作全面认证；Prominence、DH等限制另见资格记录。"
+      ],
+      "capabilities": [
+        "headless-awt",
+        "duplex-requires-permission-and-device-test",
+        "ohmidi-api24-optional-midi1",
+        "device-ports-requires-device-test",
+        "zipfs-transaction-v1"
+      ],
+      "validationLevel": "device-matrix-tested",
+      "provenance": {
+        "kind": "source-build",
+        "sourceRepository": "https://github.com/openjdk/jdk21u.git",
+        "sourceCommit": "dfcd8d2eecfe62e91070244d8eb10906dc3c812d",
+        "manifestSha256": "aee05d9dc7c0346a8955577bec054e7df722aab77e66676c63315a85e8b13d33",
+        "evidence": [
+          "精确运行包、来源输入和SDK/原生闭包由prepare-stable-runtimes重新验证；设备资格单独记录。",
+          "qualifications/jdk-code-20261113-vanilla-release.json sha256=221efd8c861602d9e3fe1c8be64d530dd62356147ea20bc66597c72828308915",
+          "原始已登记设备验收 sha256=d6813977eaca98b4d1b7620b628bef155ce622f605b3526e7100d9b48a17ff84；仅授予记录内的维护者选定矩阵。"
+        ]
+      },
+      "status": "available",
+      "requiredHostProtocol": 2
+    },
+    {
+      "id": "jdk25-ohos-20261027-code1",
+      "runtimeId": "java25-ohos-aarch64",
+      "javaVersion": "25.0.4",
+      "legacyTags": [],
+      "archive": {
+        "type": "zip",
+        "fileName": "jdk25-ohos-20261027-code1.zip",
+        "sizeBytes": 209731156,
+        "sha256": "4a80ab45c7ff879d8c80ff5c8179d27a487de688649acd67ccc9e76bd0d857cd"
+      },
+      "downloads": [
+        {
+          "sourceId": "github",
+          "transport": "single-file",
+          "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk25-ohos-20261027-code1.zip"
+        },
+        {
+          "sourceId": "web",
+          "transport": "single-file",
+          "url": "https://amcl.lovedhy.cn/runtimes/packages/jdk25-ohos-20261027-code1.zip"
+        }
+      ],
+      "notes": [
+        "修复ZIP/JAR事务写回与原件保留；需要支持宿主协议2的AMCL。",
+        "本批正式资格按维护者确认的原版门槛：MRDI-W10/API26，Minecraft 26.3 的运行、保存、退出及冷重载通过。",
+        "其他设备/最低API、联机、外设及完整整合包未作全面认证；Prominence、DH等限制另见资格记录。"
+      ],
+      "capabilities": [
+        "headless-awt",
+        "duplex-requires-permission-and-device-test",
+        "ohmidi-api24-optional-midi1",
+        "device-ports-requires-device-test",
+        "zipfs-transaction-v1"
+      ],
+      "validationLevel": "device-matrix-tested",
+      "provenance": {
+        "kind": "source-build",
+        "sourceRepository": "https://github.com/openjdk/jdk25u.git",
+        "sourceCommit": "e8f9ebe5ea813b675410a89fbfafa22e42c04e6a",
+        "manifestSha256": "ea2ef979991e949225f4fe187261983a3e158d186b4ef750dda0de22555ef596",
+        "evidence": [
+          "精确运行包、来源输入和SDK/原生闭包由prepare-stable-runtimes重新验证；设备资格单独记录。",
+          "qualifications/jdk-code-20261113-vanilla-release.json sha256=221efd8c861602d9e3fe1c8be64d530dd62356147ea20bc66597c72828308915",
+          "原始已登记设备验收 sha256=d6813977eaca98b4d1b7620b628bef155ce622f605b3526e7100d9b48a17ff84；仅授予记录内的维护者选定矩阵。"
+        ]
+      },
+      "status": "available",
+      "requiredHostProtocol": 2
     }
   ]
 }

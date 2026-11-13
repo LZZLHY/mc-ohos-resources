@@ -63,6 +63,34 @@
       "sizeBytes": 15959609,
       "sha256": "917c89e638ae75d9aba54974b4f5c2e6cc65a4edb4fe9e379350e82a47103dfd",
       "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk25-ohos-20261022-repair12-build-inputs.zip"
+    },
+    {
+      "runtimeBuildId": "jdk8-ohos-20261027-code1",
+      "fileName": "jdk8-ohos-20261027-code1-build-inputs.zip",
+      "sizeBytes": 15895045,
+      "sha256": "66735a977caaf451991dcd1c16141cc81df94ab0d4190e41ea9cd166ec42a169",
+      "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk8-ohos-20261027-code1-build-inputs.zip"
+    },
+    {
+      "runtimeBuildId": "jdk17-ohos-20261027-code1",
+      "fileName": "jdk17-ohos-20261027-code1-build-inputs.zip",
+      "sizeBytes": 16011672,
+      "sha256": "69ce8fd538744ccae7dcccc13a396cd51fa7df9b4287850cfd9856cb66dd292f",
+      "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk17-ohos-20261027-code1-build-inputs.zip"
+    },
+    {
+      "runtimeBuildId": "jdk21-ohos-20261027-code2",
+      "fileName": "jdk21-ohos-20261027-code2-build-inputs.zip",
+      "sizeBytes": 16005609,
+      "sha256": "1f0d4faa2ce139ab184d87dacde40e900a8ce8af4363b27bf1ec7b08525b657e",
+      "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk21-ohos-20261027-code2-build-inputs.zip"
+    },
+    {
+      "runtimeBuildId": "jdk25-ohos-20261027-code1",
+      "fileName": "jdk25-ohos-20261027-code1-build-inputs.zip",
+      "sizeBytes": 16008851,
+      "sha256": "cca4548230e3655de8b0953037da6fa127592d6aaf9782c65ba6fe0ce9dfca05",
+      "url": "https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/jdk25-ohos-20261027-code1-build-inputs.zip"
     }
   ]
 }

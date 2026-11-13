@@ -1,3 +1,4 @@
+import {legacySource} from './legacy-source.mjs';
 /** 正向公开宿主与稳定返回闭包的生产纯函数回归；fixture资格只验证元数据门，不授予设备资格。 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +8,7 @@ import {projectCatalogV2,derivePublishedReleaseClosure as deriveContract,fetchPu
 import {publishedHost,publishedHostFacts,officialExposure} from './fixtures/published-host.mjs';
 import {assertIsolatedFixtureKey,signCatalog,verifyEnvelope} from '../tools/protocol.mjs';
 import {validateTransition as validateV1Transition} from '../lib/catalog-validation.mjs';
-const original=JSON.parse(fs.readFileSync(new URL('../catalog/source.json',import.meta.url),'utf8'));
+const original=legacySource();
 
 /** 每槽分别造不可变协议2预览与有来源/完整矩阵标记的协议1替代，绝不重标历史legacy原件。 */
 function sourceFixture(){

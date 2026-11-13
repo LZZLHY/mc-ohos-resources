@@ -1,3 +1,4 @@
+import {legacySource} from './legacy-source.mjs';
 /** v2/v1同源投影、不可变宿主要求、撤回和公开App依赖的真实工具回归；只用内存签名私钥。 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +9,7 @@ import {generateKeyPairSync,createHash} from 'node:crypto';
 import {projectCatalogV2,projectLegacyCatalog,validateCatalogV2,validateTransitionV2,assertPublishedHostCoverage} from '../lib/catalog-v2.mjs';
 import {signCatalog,verifyEnvelope} from '../tools/protocol.mjs';
 import {publishedHost,publishedHostFacts} from './fixtures/published-host.mjs';
-const original=JSON.parse(fs.readFileSync(new URL('../catalog/source.json',import.meta.url),'utf8'));
+const original=legacySource();
 export function sourceFixture(){
  const source=structuredClone(original);source.schemaVersion=2;source.catalogRevision++;
  for(const b of source.builds)b.requiredHostProtocol=1;

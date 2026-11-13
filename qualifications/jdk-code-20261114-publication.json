@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-14T02:47:56.343386+08:00",
+  "catalogRevision": 6,
+  "runtimeChannel": "stable",
+  "sourceSha256": "6c3d61aa038964c5fceba19dba495da68971cbe65f3141cdf4d7c3ca1daeddcb",
+  "deliveryClosureSha256": "d2534d4b4466b617eea80a15043ead1fcfbb196e53c2ab2d98730f48ca2fb96f",
+  "qualification": {
+    "path": "qualifications/jdk-code-20261113-vanilla-release.json",
+    "sha256": "221efd8c861602d9e3fe1c8be64d530dd62356147ea20bc66597c72828308915",
+    "scope": "maintainer-selected vanilla matrix on MRDI-W10/API26; not all devices/modpacks or final public HAP"
+  },
+  "assetPool": "https://github.com/LZZLHY/mc-ohos-resources/releases/tag/ohos-runtimes",
+  "githubAssetReadback": {
+    "finishedAt": "2026-11-13T18:16:12.534Z",
+    "count": 26,
+    "receiptSha256": "78f3ffb2d1c0618cdc0a4d1eb5f0d824dbb4294a72e5ef42f7fe1bcc34c85794"
+  },
+  "websiteReadback": {
+    "finishedAt": "2026-11-13T18:46:24.904Z",
+    "count": 30,
+    "receiptSha256": "6fb281c0621f4d4a25184f73743f7dcfbff129e1d3d7936838a7729734443a0b"
+  },
+  "projectionReceiptSha256": "ec9b3d51d155e0673c21cfd4ece8c0c1a9237ac53a678ddfc6f39e706473fe61",
+  "signedFiles": {
+    "v2/stable.json": {
+      "sha256": "8591a4ca34cd4f811918e1f45a381b53eecb741d10212116cb6f903b96f35ab2",
+      "sizeBytes": 42878
+    },
+    "v1/stable.json": {
+      "sha256": "f71f73839df272c961fedb0675c29fa0d47d97be846f5c2973721a0233bc15c6",
+      "sizeBytes": 42397
+    },
+    "v2/preview.json": {
+      "sha256": "cae986e10b34b80161ddb1c4df44f9aacd3d541ac6faf99bbeb1c59a04968c93",
+      "sizeBytes": 42879
+    },
+    "v1/preview.json": {
+      "sha256": "205af1936b5e7c36e1cd00bddba99edae5d4a7d78425553e84df97f9e2b39b8a",
+      "sizeBytes": 42398
+    }
+  },
+  "publishedHostState": "waiting-host",
+  "appPublished": false,
+  "appStableHead": "1.0.6 / 1000910",
+  "requiredAppHostProtocol": 2,
+  "fullFinalSideloadAcceptanceComplete": false,
+  "validation": {
+    "runtimeRepositoryCases": 468,
+    "oldClientAdmissionApiParameters": [
+      20,
+      26
+    ]
+  },
+  "note": "The new GitHub catalog commit is delivered with this record. Public branch byte readback is recorded separately after push; immutable qualification evidence is not rewritten."
+}

@@ -1,3 +1,4 @@
+import {legacySource} from './legacy-source.mjs';
 /** 发行端真实协议负例与签名互操作；测试密钥只在进程内生成，不读维护者私钥。 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -5,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { generateKeyPairSync } from 'node:crypto';
 import { validateCatalog,validateTransition,signCatalog,verifyEnvelope } from '../tools/protocol.mjs';
 import { projectCatalog } from '../tools/catalog.mjs';
-const source=JSON.parse(readFileSync(new URL('../catalog/source.json',import.meta.url)));
+const source=legacySource();
 const fresh=()=>projectCatalog(structuredClone(source),'stable');
 const pair=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
 const keys={schemaVersion:1,keys:[{kid:'test',algorithm:'ES256',spki:pair.publicKey.export({type:'spki',format:'der'}).toString('base64')}]};

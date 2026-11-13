@@ -4,7 +4,9 @@ AMCL 的 HarmonyOS NEXT OpenJDK 运行包、签名目录和来源记录。目标
 
 新版运行包集中在 [统一资产池](https://github.com/LZZLHY/mc-ohos-resources/releases/tag/ohos-runtimes)，每个 JDK 仍是独立 ZIP。旧 Release、文件名和 Gitee 分卷保留，兼容旧 AMCL 下载方式。
 
-当前四代预览修复批次为 JDK8/17/21/25 的 `jdk<major>-ohos-20261022-repair12`（R12），实际推荐以签名目录为准。每代均提供独立完整运行包、冻结源码输入包和来源收据；包含应用 C++/展开器、TLS/装载生命周期、进程、字体与 JavaSound 修复，并修复原生临时目录、真实 UID 的 PerfData 命名及正常 VM 退出后的 Attach socket / PerfData 路径清理。
+当前稳定目录 revision 6 提供 JDK8/17/25 的 `jdk<major>-ohos-20261027-code1` 与 JDK21 的 `jdk21-ohos-20261027-code2`，每份都有运行 ZIP 和冻结源码输入 ZIP。新包需要真实 host 2 支持；旧 App 拒绝不兼容的新推荐。App 1.0.7 的正式侧载候选尚在验收，本次没有公开 App 原件或切换 App 推荐。验收范围、公开回读与来源见 [本批发行记录](qualifications/jdk-code-20261114-publication.json)。
+
+上一轮四代预览修复批次为 JDK8/17/21/25 的 `jdk<major>-ohos-20261022-repair12`（R12），历史原件继续保留。每代均提供独立完整运行包、冻结源码输入包和来源收据；包含应用 C++/展开器、TLS/装载生命周期、进程、字体与 JavaSound 修复，并修复原生临时目录、真实 UID 的 PerfData 命名及正常 VM 退出后的 Attach socket / PerfData 路径清理。
 
 四份 R12 已在 API26 MRDI-W10 平板通过按精确包身份记录的基础/扩展 Java、字体、进程内工具、固定子进程命令、TCP/TLS/JFR、只读 Attach、jvmstat 共享计数与双 VM 退出清理。手机、游戏及性能、独立 CLI/JLI、真实外设 I/O、最低 API 和 desktop 尚未取得完整资格；当前仍为预览，不能据此宣称完整设备矩阵或全部 JDK 功能通过。
 
@@ -21,7 +23,7 @@ AMCL 的 HarmonyOS NEXT OpenJDK 运行包、签名目录和来源记录。目标
 ## 使用目录
 
 - [catalog/source.json](catalog/source.json)：唯一手工目录源，维护稳定/预览推荐、完整包与分卷 SHA-256、大小、URL、能力和验收证据。
-- [稳定目录](catalog/v1/stable.json)、[预览目录](catalog/v1/preview.json)：标准 JWS JSON，固定 ES256/P-256 公钥验签。
+- [v2 稳定目录](catalog/v2/stable.json)、[v2 预览目录](catalog/v2/preview.json)：标准 JWS JSON，固定 ES256/P-256 公钥验签；[v1 稳定兼容投影](catalog/v1/stable.json) 与 [v1 预览兼容投影](catalog/v1/preview.json) 来自同一批源，不伪造旧宿主支持。
 - [可信公钥](catalog/trusted-keys.json)：只有公开验签键，私钥不在仓库或 Web 服务器。
 - [来源记录](provenance/)：源码构建收据与配方/补丁源码输入包索引。
 - [网页运行时列表](https://amcl.lovedhy.cn/runtimes)：消费同一签名目录，不另维护版本表。

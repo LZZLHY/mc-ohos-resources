@@ -1,3 +1,4 @@
+import {legacySource} from './legacy-source.mjs';
 /** Node WebCrypto 与真实浏览器共用同一验证器；不用自造的“验签成功”替身。 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +9,7 @@ import {signCatalog} from '../tools/protocol.mjs';
 import {projectCatalog} from '../tools/catalog.mjs';
 const pair=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
 const keys={keys:[{kid:'browser-test',algorithm:'ES256',spki:pair.publicKey.export({type:'spki',format:'der'}).toString('base64')}]};
-const catalog=projectCatalog(JSON.parse(readFileSync(new URL('../catalog/source.json',import.meta.url))),'preview');
+const catalog=projectCatalog(legacySource(),'preview');
 const raw=JSON.stringify(signCatalog(catalog,pair.privateKey,'browser-test'));
 test('Node signing interoperates with WebCrypto P1363',async()=>assert.deepEqual(await verifyBrowserCatalog(raw,keys,'preview'),catalog));
 test('browser rejects forged payload, unknown key, channel and expiry',async()=>{

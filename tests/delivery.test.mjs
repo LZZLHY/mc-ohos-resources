@@ -1,3 +1,4 @@
+import {legacySource} from './legacy-source.mjs';
 /** 发布闭包与真实文件替换负例；只用合成包和进程内测试键，不访问维护者密钥或网络。 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +20,7 @@ import {projectCatalogV2} from '../lib/catalog-v2.mjs';
 const publicFacts=(product,make,revision=4)=>({...publishedHostFacts(['stable','preview'].map(channel=>make(channel))).products.find(p=>p.product===product),historyRevision:revision});
 const publicHostFetch=async url=>{const product=new URL(url).searchParams.get('product');return Response.json(publicFacts(product,channel=>publishedHost({product,channel})));};
 
-const sourceTemplate=JSON.parse(readFileSync(new URL('../catalog/source.json',import.meta.url)));
+const sourceTemplate=legacySource();
 const raw=value=>Buffer.from(JSON.stringify(value,null,2)+'\n');
 const pool='https://github.com/LZZLHY/mc-ohos-resources/releases/download/ohos-runtimes/';
 

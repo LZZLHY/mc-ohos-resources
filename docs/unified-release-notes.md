@@ -1,6 +1,17 @@
 用于新版 AMCL JSON 目录的统一运行时资产池。每个 JDK 仍为独立压缩包，文件只追加，不覆盖旧资产。
 
-当前新构建在预览通道提供；验收范围与 SHA-256 以仓库签名目录及来源清单为准。JDK17 的目标模组场景已收到用户通过反馈，不能据此宣称全部设备或模组均通过。
+2026-11-14：稳定目录 revision 6 提供以下四套正式运行时及对应源码输入包：
+
+- JDK8：`jdk8-ohos-20261027-code1`
+- JDK17：`jdk17-ohos-20261027-code1`
+- JDK21：`jdk21-ohos-20261027-code2`
+- JDK25：`jdk25-ohos-20261027-code1`
+
+新运行时需要支持 host 2 的 AMCL。App 1.0.7 正式侧载包目前处于验收阶段，尚未公开；旧 App 会拒绝不兼容的新推荐。该 Release 是跨批次资产池，其页面标签不代表每个 JDK 的稳定/预览通道；实际推荐、SHA-256 与资格以同批 v1/v2 签名目录及来源记录为准。
+
+本批按维护者确定的原版标准，通过 MRDI-W10/API26 上 Minecraft 1.12.2、1.16.5、1.20.1、1.21.4、26.3 的运行、保存、退出和冷读档。该范围不代表全部设备、Java SE 功能或整合包通过；Prominence 等残项继续保留，Distant Horizons 暂不列入适配清单。详见仓库 `qualifications/jdk-code-20261113-vanilla-release.json`。
+
+Stable catalog revision 6 provides JDK 8/17/21/25 runtime and source-input archives listed above. They require an AMCL host with protocol 2 support. The final AMCL 1.0.7 sideload app is being validated and has not been published. Qualification is limited to the recorded vanilla Minecraft matrix on the MRDI-W10/API26 tablet; it does not certify every device, Java SE feature or modpack. Channel status comes from the signed catalogs, not the label of this shared asset-pool release.
 
 旧版 AMCL 使用的历史 Release、文件名和分卷继续保留。包更新、通道推荐和镜像维护步骤见仓库 README。
 

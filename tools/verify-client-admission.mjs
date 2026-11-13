@@ -10,7 +10,7 @@ import {pathToFileURL,fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {generateKeyPairSync,verify,createPublicKey} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {sha256,signCatalog,verifyRuntimeHostHistory} from './protocol.mjs';
+import {sha256,signCatalog,verifyRuntimeHostHistory,verifyEnvelope} from './protocol.mjs';
 import {projectCatalog} from './catalog.mjs';
 import {projectLegacyCatalog} from '../lib/catalog-v2.mjs';
 
@@ -46,16 +46,25 @@ async function main(){
   const pair=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
   const keys={schemaVersion:1,keys:[{kid:'admission-test',algorithm:'ES256',spki:pair.publicKey.export({format:'der',type:'spki'}).toString('base64')}]};
   const envelope=JSON.stringify(signCatalog(preview,pair.privateKey,'admission-test'));
+  // 可选发行连续性门直接读取本批生产公钥签名的 v1 stable。旧源码必须仍能提供
+  // 四个正式旧槽，不能把“拒绝新ABI”误当作“稳定通道仍可下载”的充分证明。
+  const requireCurrentStable=args.includes('--require-current-stable');
+  let currentStableRaw,currentStable;
+  if(requireCurrentStable){
+    const pinned=JSON.parse(await readFile(resolve(root,'catalog/trusted-keys.json'),'utf8'));
+    currentStableRaw=await readFile(resolve(root,'catalog/v1/stable.json'),'utf8');
+    currentStable=verifyEnvelope(currentStableRaw,pinned,'stable');keys.keys.push(...pinned.keys);
+  }
   const results=[];
   for(const apiVersion of [20,26]){
-    const files=new Map();let requests=0;
+    const files=new Map();let requests=0,remoteEnvelope=envelope;
     const dependencies={
       '@kit.ArkTS':{util:{TextDecoder:{create:()=>({decodeToString:b=>new TextDecoder('utf-8',{fatal:true}).decode(b)})},
         TextEncoder:class{encodeInto(t){return new Uint8Array(Buffer.from(t));}},
         Base64Helper:class{decodeSync(t){return new Uint8Array(Buffer.from(t,'base64'));}encodeToStringSync(b){return Buffer.from(b).toString('base64');}}}},
       '@kit.CryptoArchitectureKit':{cryptoFramework:{createAsyKeyGenerator:()=>({convertKey:async b=>({pubKey:createPublicKey({key:Buffer.from(b.data),type:'spki',format:'der'})})}),
         createVerify:algorithm=>{assert.equal(algorithm,'ECC256|SHA256');let key;return{init:async k=>{key=k;},verify:async(d,s)=>verify('sha256',d.data,key,s.data)};}}},
-      '@kit.NetworkKit':{http:{RequestMethod:{GET:'GET'},HttpDataType:{STRING:'string'},createHttp:()=>({request:async()=>{requests++;return{responseCode:200,result:envelope};},destroy:()=>{}})}},
+      '@kit.NetworkKit':{http:{RequestMethod:{GET:'GET'},HttpDataType:{STRING:'string'},createHttp:()=>({request:async()=>{requests++;return{responseCode:200,result:remoteEnvelope};},destroy:()=>{}})}},
       '@kit.BasicServicesKit':{deviceInfo:{sdkApiVersion:apiVersion}},
       '@kit.CoreFileKit':{fileIo:{OpenMode:{CREATE:1,WRITE_ONLY:2,TRUNC:4},
         statSync:path=>{if(!files.has(path))throw Error('ENOENT');return{size:Buffer.byteLength(files.get(path))};},
@@ -69,16 +78,31 @@ async function main(){
     const repository=api.RuntimeCatalogRepository.instance(context);
     const supported=stable.runtimes.filter(r=>validation.supportsRuntime(r,apiVersion));assert(supported.length>0,'old protocol baseline must be accepted');
     for(const runtime of supported)assert(repository.buildFor(String(runtime.javaMajor)),'old supported runtime must provide its real recommendation');
+    let currentStableBuilds=[];
+    if(requireCurrentStable){
+      remoteEnvelope=currentStableRaw;await repository.configure('stable','github',false);
+      assert.equal((await repository.refresh()).ok,true,'旧真实Repository必须接受本批生产签名目录');
+      assert.deepEqual(repository.definitions().map(r=>r.javaMajor),[8,17,21,25],'旧稳定目录不能清空任何受支持槽');
+      currentStableBuilds=repository.definitions().map(runtime=>{
+        const selected=repository.buildFor(String(runtime.javaMajor));assert(selected,'旧稳定槽必须可下载');
+        assert.equal(runtime.loaderProtocol,1);assert.equal(selected.provenance.kind,'legacy');
+        return {javaMajor:runtime.javaMajor,buildId:selected.id,sha256:selected.archive.sha256};
+      });
+      assert.equal(repository.snapshot().catalogRevision,currentStable.catalogRevision);
+      remoteEnvelope=envelope;
+    }
     await repository.configure('preview','github',false);
     assert.equal((await repository.refresh()).ok,true,'signed future protocol remains structurally readable');
-    assert.equal(requests,1,'actual Repository must request the signed catalog');
+    assert.equal(requests,requireCurrentStable?2:1,'actual Repository must request the signed catalogs');
     assert.equal(repository.snapshot().channel,'preview');
     for(const runtime of preview.runtimes){assert.equal(validation.supportsRuntime(runtime,apiVersion),false);assert.equal(repository.buildFor(String(runtime.javaMajor)),undefined);}
-    results.push({apiVersion,oldSupportedMajors:supported.map(r=>r.javaMajor),futureProtocol:protocol,downloadRecommendationsRejected:true});
+    results.push({apiVersion,oldSupportedMajors:supported.map(r=>r.javaMajor),futureProtocol:protocol,downloadRecommendationsRejected:true,
+      ...(requireCurrentStable?{currentStableRevision:currentStable.catalogRevision,currentStableBuilds}: {})});
   }
   const receipt={schemaVersion:1,verifiedAt:new Date().toISOString(),clientCommit:commit,sourceSha256:identities,sourceSchemaVersion:source.schemaVersion,baseline,
     test:'real old Repository + signed catalog + production supportsRuntime/buildFor',results,
-    scope:'host protocol rejection only; no installed HAP/device runtime qualification'};
+    scope:requireCurrentStable?'real old source accepts current signed stable four-slot recommendations and rejects unsupported protocol; device download remains separate':
+      'host protocol rejection only; no installed HAP/device runtime qualification'};
   await mkdir(dirname(out),{recursive:true});await writeFile(out,JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});
   console.log(JSON.stringify(receipt,null,2));
 }

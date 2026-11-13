@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "catalogRevision": 6,
-  "issuedAt": "2026-11-13T12:47:32Z",
-  "expiresAt": "2027-02-11T12:47:32Z",
+  "catalogRevision": 7,
+  "issuedAt": "2026-11-13T21:50:55Z",
+  "expiresAt": "2027-02-11T21:50:55Z",
   "runtimes": [
     {
       "id": "java8-ohos-aarch64",
@@ -16,15 +16,17 @@
       "minimumApi": 20,
       "recommendations": {
         "stable": {
-          "recommendationRevision": 2,
+          "recommendationRevision": 3,
           "recommendedBuildIds": [
-            "jdk8-ohos-20261027-code1"
+            "jdk8-ohos-20261027-code1",
+            "8u452-ohos-4"
           ]
         },
         "preview": {
-          "recommendationRevision": 5,
+          "recommendationRevision": 6,
           "recommendedBuildIds": [
-            "jdk8-ohos-20261027-code1"
+            "jdk8-ohos-20261027-code1",
+            "8u452-ohos-4"
           ]
         }
       }
@@ -41,15 +43,17 @@
       "minimumApi": 20,
       "recommendations": {
         "stable": {
-          "recommendationRevision": 2,
+          "recommendationRevision": 3,
           "recommendedBuildIds": [
-            "jdk17-ohos-20261027-code1"
+            "jdk17-ohos-20261027-code1",
+            "17.0.13-ohos-5"
           ]
         },
         "preview": {
-          "recommendationRevision": 4,
+          "recommendationRevision": 5,
           "recommendedBuildIds": [
-            "jdk17-ohos-20261027-code1"
+            "jdk17-ohos-20261027-code1",
+            "17.0.13-ohos-5"
           ]
         }
       }
@@ -66,15 +70,17 @@
       "minimumApi": 20,
       "recommendations": {
         "stable": {
-          "recommendationRevision": 2,
+          "recommendationRevision": 3,
           "recommendedBuildIds": [
-            "jdk21-ohos-20261027-code2"
+            "jdk21-ohos-20261027-code2",
+            "21.0.5-ohos-7"
           ]
         },
         "preview": {
-          "recommendationRevision": 4,
+          "recommendationRevision": 5,
           "recommendedBuildIds": [
-            "jdk21-ohos-20261027-code2"
+            "jdk21-ohos-20261027-code2",
+            "21.0.5-ohos-7"
           ]
         }
       }
@@ -91,15 +97,17 @@
       "minimumApi": 20,
       "recommendations": {
         "stable": {
-          "recommendationRevision": 2,
+          "recommendationRevision": 3,
           "recommendedBuildIds": [
-            "jdk25-ohos-20261027-code1"
+            "jdk25-ohos-20261027-code1",
+            "25.0.4-ohos-2"
           ]
         },
         "preview": {
-          "recommendationRevision": 4,
+          "recommendationRevision": 5,
           "recommendedBuildIds": [
-            "jdk25-ohos-20261027-code1"
+            "jdk25-ohos-20261027-code1",
+            "25.0.4-ohos-2"
           ]
         }
       }

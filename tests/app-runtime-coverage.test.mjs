@@ -60,6 +60,22 @@ test('已公开新App的稳定供给不能被后续JDK目录抽走',()=>{
   source.builds.find(b=>b.id==='fixed-25').capabilities=[];
   assert.throws(()=>derivePublishedReleaseClosure(pair(source),publishedHostFacts([host])),/APP_STABLE_RUNTIME_INCOMPATIBLE/);
 });
+
+test('显式目录reader2与旧v1下载并存，不能用宿主ABI或恢复reader替代目录声明',()=>{
+  const source=fixture();
+  for(const runtime of source.runtimes)for(const channel of ['stable','preview'])
+    runtime.recommendations[channel].recommendedBuildIds.push('legacy-'+runtime.javaMajor);
+  const catalogs=stablePair(source),host={...target(),runtimeCatalogProtocol:2};
+  assert(catalogs[0].runtimes.every(r=>r.loaderProtocol===1));
+  const proof=assertAppRuntimeCoverage(catalogs,host);
+  assert.equal(proof.selections.length,4);assert(proof.selections.every(s=>s.schemaVersion===2&&s.buildId.startsWith('fixed-')));
+  assert.throws(()=>assertAppRuntimeCoverage(catalogs,target()),/INCOMPATIBLE:v1/);
+  assert.throws(()=>assertAppRuntimeCoverage(catalogs,{...host,runtimeCatalogProtocol:1}),/INCOMPATIBLE:v1/);
+  for(const bad of [null,0,3,'2'])assert.throws(()=>assertAppRuntimeCoverage(catalogs,{...host,runtimeCatalogProtocol:bad}),/CATALOG_PROTOCOL_INVALID/);
+  derivePublishedReleaseClosure(pair(source),publishedHostFacts([host]));
+  source.builds.find(b=>b.id==='fixed-25').capabilities=[];
+  assert.throws(()=>assertAppRuntimeCoverage(stablePair(source),host),/INCOMPATIBLE:v2\/25/);
+});
 test('v1单推荐不改变其它历史build的协议；没有真实绑定或存在冲突必须拒绝',()=>{
   const modern=projectCatalogV2(fixture(),'stable'),legacy=projectLegacyCatalogFromV2(modern);
   assert.throws(()=>releaseCatalogV2(legacy),/BUILD_HOST_BINDING_REQUIRED:legacy/);

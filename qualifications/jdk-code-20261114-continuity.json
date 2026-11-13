@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-14T06:43:35.801389+08:00",
+  "catalogRevision": 7,
+  "sourceSha256": "af67a7ee6ba295afd0ea74cf802423d4ad80ec04b510cf1a079e8f057397a74c",
+  "signedCatalogs": {
+    "v2/stable.json": {
+      "sha256": "fce06b190a227d03a76358de4b1833f1f18ffea0a5ffe14387216e34758c1d5f",
+      "sizeBytes": 42963
+    },
+    "v1/stable.json": {
+      "sha256": "fade68bea1d09d4bdaaebe5f0e4a4aa0bf9e00020e4809bdc809e457d7e38779",
+      "sizeBytes": 42334
+    },
+    "v2/preview.json": {
+      "sha256": "95a0074305d74842260bb9383a837a662e460de337f55e28c7b696f18162e010",
+      "sizeBytes": 42965
+    },
+    "v1/preview.json": {
+      "sha256": "c284af06ff5deb141f1cd17f6dba64472d7f46253b1069b101d0116b22f41712",
+      "sizeBytes": 42335
+    }
+  },
+  "initialRevision6Issue": "Protocol1 clients correctly rejected new host2 recommendations but had no compatible download slots. Revision7 retains a real legacy recommendation alongside each modern recommendation.",
+  "app": {
+    "version": "1.0.6",
+    "versionCode": 1000910,
+    "sourceCommit": "fb1b299f87c7bbac069cac24cfe65df303ebb381",
+    "officialUnsignedSha256": "f6b597c49a5abf2f143bba955dab7facfba52039204b6bb264aac8def7979796",
+    "exactPayloadResignedForTest": true,
+    "testHapSha256": "a97625d1b53f82b19adb385b5fdd994a117a98d1324d7fac5cca745a349e8933"
+  },
+  "device": {
+    "model": "MRDI-W10",
+    "api": 26
+  },
+  "channelThroughout": "stable",
+  "normalUiDownloads": true,
+  "runtimeOrReceiptInjection": false,
+  "legacyRuntimes": [
+    {
+      "javaMajor": 8,
+      "buildId": "8u452-ohos-4",
+      "archiveSha256": "02c2cedb3539682de3df3d7870b855bfefaac1f4cfe53951cfe90b0dea3d3a63",
+      "libjvmSha256": "6fa1cb78642e1d2e91724bf9759b8b1a996dfa6eb37faa3d3705c8004a2ab51f"
+    },
+    {
+      "javaMajor": 17,
+      "buildId": "17.0.13-ohos-5",
+      "archiveSha256": "0e26b0dece38156838456cfb12058d863aa9856cdd8fd648f06f9bc5e91f8ecd",
+      "libjvmSha256": "fa18d967210657215bb0dfff89f8f86cc7fac3ed9e79266e73e6ab6471d8d051"
+    },
+    {
+      "javaMajor": 21,
+      "buildId": "21.0.5-ohos-7",
+      "archiveSha256": "21556d0d4fc5eea09ba27068cf8a96803bb1667b35adbc8495fdc5f831316275",
+      "libjvmSha256": "0f5e4f5d24b0109aad61499cd6a463551e2301e07e850799a7211b67d6a4df03"
+    },
+    {
+      "javaMajor": 25,
+      "buildId": "25.0.4-ohos-2",
+      "archiveSha256": "d8e31df5d199a9b34d6d13c188b71af19c2fb1738da7bf3c6eeaed89a0a37538",
+      "libjvmSha256": "82e3bb7468af7da286a3052eb906fd323eba21917e959dd7fd2c4947c33ed264"
+    }
+  ],
+  "acceptanceEvidenceSha256": "6eec252495ae07ae087558afeb3c414f6c594b401f51eabe6c69c9ca86ba74cf",
+  "rawEvidenceLocation": "maintainer private evidence; no device identifiers or private absolute paths published",
+  "newRuntimeArchivesUnchanged": true,
+  "app107Published": false,
+  "final107HapAcceptanceComplete": false,
+  "scope": "exact1.0.6 public stable legacy download and installed libjvm identity only; final1.0.7 overlay, clean install and games are separate"
+}

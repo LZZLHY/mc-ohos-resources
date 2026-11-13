@@ -307,3 +307,11 @@ receipt只作对账索引，权威仍是固定公钥JWS及真正激活时从官�
 新App在实际HAP中声明`runtimeRequiredCapabilities`与`runtimeRequiredMajors`。`assertAppRuntimeCoverage`要求实际stable v1/v2同源投影、未过期、覆盖目标最低API/ABI和每个major，并按客户端顺序选择同时满足host与行为的首项，再核源码/完整manifest和设备资格。新App回落v1不能重新选旧问题包；后续JDK发布同样不能抽走已公开App需要的稳定供给。
 
 `zipfs-transaction-v1`必须由已绑定来源收据的0019 ZIPFS补丁声明支撑，不能只手填capability。资格与包身份依旧不可假造，本地单平板结果不自动升级为device-matrix-tested。首批顺序为：准备并验证JDK资产和完整四文件batch→先部署真实v1并携带batch→部署同批v2→公开源全部就绪→App反向覆盖门通过后再公开App；本次未执行其中任何公开步骤。
+
+## 2026-11-13 本批限定发行矩阵
+
+维护者随后明确将本次严重阻碍限定为原版无法正常游玩，不再以单个整合包失败否决发行，并要求继续联合发布准备。基于最后一轮实际原版验收，本批四个 `20261027-code` build 的发行矩阵明确限定为 MRDI-W10/API26 上记录的五个原版、十次会话；完整身份和逐次结果见 [资格记录](../qualifications/jdk-code-20261113-vanilla-release.json)。
+
+因此仅在这四份**外置候选**中将 `validationLevel` 记为 `device-matrix-tested`，其含义为该记录内维护者选定矩阵已通过。这是本批有证据的范围裁定，不是单次启动自动晋级，不代表完整多设备、最低 API、外设、整合包或最终公开产品 HAP 已通过。既有构建原件、历史资格、生产验证器、线上目录均不修改；本节也不授权其他批次照搬资格或绕过生产签名/资产读回门。
+
+后续联合发布使用 [本批准备记录](joint-release-preparation-2026-11-13.md) 绑定的源和原件，签名时仍需真实远端完整读回收据与当时公开宿主事实。未签名载荷、本地审计和本批范围裁定均不能替代这些交付证据。
